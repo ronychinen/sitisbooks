@@ -14,7 +14,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
   const [{ data: reqs }, { data: profs }, { count: books }] = await Promise.all([
     supabase.from("requests").select("*").order("created_at", { ascending: false }).limit(1000),
     supabase.from("profiles").select("*"),
-    supabase.from("books").select("id", { count: "exact", head: true }).eq("status", "disponible"),
+    supabase.from("catalog").select("id", { count: "exact", head: true }),
   ]);
   const R = (reqs ?? []) as Request[];
   const members = Object.fromEntries(((profs ?? []) as Profile[]).map((p) => [p.id, p]));

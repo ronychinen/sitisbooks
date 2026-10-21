@@ -77,6 +77,7 @@ create table if not exists public.requests (
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
 );
+alter table public.requests add column if not exists delivered_at timestamptz;
 create index if not exists requests_status_idx on public.requests(status, created_at desc);
 
 -- ---------- Helpers ----------
@@ -111,8 +112,9 @@ create policy "libros visibles" on public.books for select
   using (status = 'disponible' or owner_id = auth.uid() or public.is_admin());
 
 drop policy if exists "intercambios propios o admin" on public.requests;
-create policy "intercambios propios o admin" on public.requests for select
-  using (requester_id = auth.uid() or donor_id = auth.uid() or public.is_admin());
+drop policy if exists "intercambios solo admin" on public.requests;
+create policy "intercambios solo admin" on public.requests for select
+  using (public.is_admin());
 
 -- Toda escritura pasa por las funciones de abajo (security definer).
 
@@ -226,7 +228,7 @@ begin
     update public.books set status = 'entregado' where id = r.book_id;
     update public.profiles set credits = credits + 1, donated = donated + 1 where id = r.donor_id;
     update public.profiles set received = received + 1 where id = r.requester_id;
-    update public.requests set credit_granted = true where id = r.id;
+    update public.requests set credit_granted = true, delivered_at = coalesce(p_delivery, now()) where id = r.id;
   elsif p_status = 'cancelado' then
     update public.books set status = 'disponible' where id = r.book_id and status = 'reservado';
     update public.profiles set credits = credits + 1 where id = r.requester_id;
@@ -260,6 +262,42 @@ grant execute on function public.is_admin to anon, authenticated;
 grant execute on function public.save_profile, public.publish_book, public.withdraw_book, public.request_book,
   public.submit_payment, public.cancel_my_request, public.admin_review_payment, public.admin_update_request,
   public.admin_set_credits to authenticated;
+
+-- ---------- Privacidad: vistas seguras para usuarios ----------
+-- Los usuarios NUNCA leen las tablas books/requests directamente: solo estas vistas,
+-- que no exponen quién dona, quién recibe, distritos ni datos de otros usuarios.
+revoke select on public.books from anon, authenticated;
+
+create or replace view public.catalog as
+  select id, title, author, cover_url, genre, condition, note, created_at,
+         (owner_id = auth.uid()) as is_mine
+  from public.books
+  where status = 'disponible';
+
+create or replace view public.my_books as
+  select id, title, author, cover_url, genre, condition, note, status, created_at
+  from public.books
+  where owner_id = auth.uid() and status <> 'retirado';
+
+create or replace view public.my_requests as
+  select r.id,
+         case when r.requester_id = auth.uid() then 'recibido' else 'donado' end as role,
+         r.book_title, r.book_cover, r.created_at, r.delivered_at,
+         -- El donante ve un estado simplificado (no ve el pago del otro usuario)
+         case when r.requester_id = auth.uid() then r.status
+              when r.status in ('pendiente_pago','pago_en_revision','pagado') then 'reservado'
+              else r.status end as status,
+         case when r.requester_id = auth.uid() then r.delivery_fee end as delivery_fee,
+         case when r.requester_id = auth.uid() then r.platform_fee end as platform_fee,
+         case when r.requester_id = auth.uid() then r.total end as total,
+         case when r.requester_id = auth.uid() then r.payment_note end as payment_note,
+         case when r.requester_id = auth.uid() then r.delivery_at end as delivery_at,
+         case when r.donor_id = auth.uid() then r.pickup_at end as pickup_at
+  from public.requests r
+  where r.requester_id = auth.uid() or r.donor_id = auth.uid();
+
+grant select on public.catalog to anon, authenticated;
+grant select on public.my_books, public.my_requests to authenticated;
 
 -- ---------- Primer admin (ejecutar DESPUÉS de crear tu perfil en la web) ----------
 -- update public.profiles set is_admin = true where email = 'tu-correo@dominio.com';

@@ -2,22 +2,24 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireProfile } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
-import { STATUS_LABEL, fmtDT, soles, type Request, type Settings } from "@/lib/constants";
+import { STATUS_LABEL, fmtD, fmtDT, soles, type MyRequest, type Settings } from "@/lib/constants";
 import PaymentForm from "./PaymentForm";
 
 export const dynamic = "force-dynamic";
-const STEPS = ["pendiente_pago", "pago_en_revision", "pagado", "coordinando", "en_camino", "entregado"];
+const STEPS_REQ = ["pendiente_pago", "pago_en_revision", "pagado", "coordinando", "en_camino", "entregado"];
+const STEPS_DON = ["reservado", "coordinando", "en_camino", "entregado"];
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { supabase, profile } = await requireProfile(`/mis-intercambios/${id}`);
   const [{ data }, { data: settings }] = await Promise.all([
-    supabase.from("requests").select("*").eq("id", id).maybeSingle(),
+    supabase.from("my_requests").select("*").eq("id", id).maybeSingle(),
     supabase.from("settings").select("*").eq("id", 1).maybeSingle(),
   ]);
   if (!data) notFound();
-  const r = data as Request, s = settings as Settings | null;
-  const isReq = r.requester_id === profile.id;
+  const r = data as MyRequest, s = settings as Settings | null;
+  const isReq = r.role === "recibido";
+  const STEPS = isReq ? STEPS_REQ : STEPS_DON;
   const idx = STEPS.indexOf(r.status);
 
   return (
@@ -39,6 +41,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
               {STATUS_LABEL[st]}
               {st === "coordinando" && r.pickup_at && <span className="muted"> · recojo {fmtDT(r.pickup_at)}</span>}
               {st === "en_camino" && r.delivery_at && <span className="muted"> · entrega {fmtDT(r.delivery_at)}</span>}
+              {st === "entregado" && r.delivered_at && <span className="muted"> · {fmtD(r.delivered_at)}</span>}
             </li>
           ))}
         </ol>
@@ -46,7 +49,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
       {isReq && (
         <div className="panel cost">
-          <span>Delivery {r.from_district} → {r.to_district}</span><span className="n">{soles(r.delivery_fee)}</span>
+          <span>Delivery a tu distrito</span><span className="n">{soles(r.delivery_fee)}</span>
           <span>Comisión Sitisbooks</span><span className="n">{soles(r.platform_fee)}</span>
           <span className="tot">Total</span><span className="n tot">{soles(r.total)}</span>
         </div>
@@ -68,8 +71,9 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         </section>
       )}
       {isReq && r.status === "pago_en_revision" && <p className="note">Recibimos tu comprobante. Lo validamos y te escribimos por WhatsApp para coordinar la entrega.</p>}
-      {!isReq && <p className="note">Te escribiremos por WhatsApp al {profile.phone} para coordinar el recojo en tu dirección.</p>}
-      {r.status === "cancelado" && <p className="muted">Este intercambio fue cancelado.{isReq && " Tu crédito fue devuelto."}</p>}
+      {!isReq && r.status !== "entregado" && r.status !== "cancelado" && <p className="note">Sitisbooks te escribirá por WhatsApp al {profile.phone} para coordinar el recojo en tu dirección. No compartimos tus datos con quien recibe el libro.</p>}
+      {!isReq && r.status === "entregado" && <p className="note">Tu libro llegó a su nuevo lector el {fmtD(r.delivered_at)}. Ganaste 1 crédito.</p>}
+      {r.status === "cancelado" && <p className="muted">{isReq ? "Este pedido fue cancelado. Tu crédito fue devuelto." : "Este pedido fue cancelado. Tu libro volvió al catálogo."}</p>}
     </div>
   );
 }

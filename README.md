@@ -16,6 +16,8 @@ Plataforma para intercambiar libros en Lima Metropolitana. Cada libro donado y e
   - Cancela intercambios (el crédito se devuelve).
   - Edita créditos de cada usuario.
   - Configura la comisión, la tarifa por distrito y los datos de Yape y transferencia.
+- **Historial del usuario:** en "Mis intercambios → Historial" ve los libros que donó y los que recibió, cada uno con su fecha de entrega.
+- **Privacidad total entre usuarios:** nadie ve quién dona o recibe un libro, ni su nombre, distrito, dirección, teléfono, pagos o fechas. El catálogo no muestra datos del donante. Sitisbooks coordina todo y solo el admin ve los datos de contacto. Esto se aplica en la base de datos: los usuarios no pueden leer las tablas directamente, solo vistas seguras (`catalog`, `my_books`, `my_requests`).
 - **Estados de un intercambio:** Pendiente de pago → Pago en revisión → Pagado → Recojo programado → En camino → Entregado (o Cancelado). Al marcar "Entregado", el donante recibe su crédito automáticamente.
 
 Las reglas de créditos y estados viven en funciones de Postgres (`supabase/schema.sql`). Así no se pueden alterar desde el navegador.
@@ -38,6 +40,8 @@ Las reglas de créditos y estados viven en funciones de Postgres (`supabase/sche
 5. En **Project Settings → API**, copia la **Project URL** y la **anon / publishable key**.
 
 > **Límite del correo por defecto:** el servidor de correo incluido en Supabase tiene un límite bajo de envíos por hora y está pensado solo para pruebas. Antes de abrir al público, configura un SMTP propio en **Authentication → Emails → SMTP Settings** (por ejemplo Resend con un dominio propio). El código de la web no cambia.
+
+> **¿Actualizas desde una versión anterior?** Vuelve a ejecutar `supabase/schema.sql` completo. Es seguro correrlo varias veces y no borra datos.
 
 ### 2. Vercel
 

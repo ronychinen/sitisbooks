@@ -2,21 +2,21 @@ import { requireProfile } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
 import DonateForm from "./DonateForm";
 import WithdrawButton from "./WithdrawButton";
-import type { Book } from "@/lib/constants";
+import type { MyBook } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 const LABEL: Record<string, string> = { disponible: "Disponible", reservado: "Reservado", entregado: "Donado", retirado: "Retirado" };
 
 export default async function Page() {
   const { supabase, profile } = await requireProfile("/donar");
-  const { data } = await supabase.from("books").select("*").eq("owner_id", profile.id).neq("status", "retirado").order("created_at", { ascending: false });
-  const mine = (data ?? []) as Book[];
+  const { data } = await supabase.from("my_books").select("*").order("created_at", { ascending: false });
+  const mine = (data ?? []) as MyBook[];
   return (
     <div className="split">
       <section className="panel stack">
         <div>
           <h2>Publica un libro para donar</h2>
-          <p className="muted" style={{ marginTop: 6 }}>Lo recogemos en {profile.district}. Ganas 1 crédito cuando llega a su nuevo lector.</p>
+          <p className="muted" style={{ marginTop: 6 }}>Lo recogemos en {profile.district}. Ganas 1 crédito cuando llega a su nuevo lector. Sitisbooks coordina contigo el recojo: nadie más ve tus datos.</p>
         </div>
         <DonateForm />
       </section>
