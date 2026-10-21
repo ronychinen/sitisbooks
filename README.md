@@ -8,6 +8,7 @@ Plataforma para intercambiar libros en Lima Metropolitana. Cada libro donado y e
 
 - **Registro e ingreso con OTP:** el usuario escribe su correo, recibe un código y activa su cuenta. Luego completa su perfil (nombres, apellidos, celular, distrito, dirección y referencia) y recibe 1 crédito de bienvenida.
 - **Donar un libro:** el usuario escribe título y autor y la web busca portadas en Open Library y Google Books. El usuario confirma cuál es la correcta. Si ninguna coincide, puede subir una foto o publicar sin portada.
+- **Sin datos de contacto en las publicaciones:** el título y el autor no aceptan más de 5 números en total, correos, @usuarios, enlaces ni menciones a redes sociales. Se valida en la web y también en la base de datos. El libro no tiene campo de nota.
 - **Catálogo público:** búsqueda por título y autor, filtro por género y distrito.
 - **Pedir un libro:** usa 1 crédito y reserva el libro. El usuario ve el total, paga por Yape o transferencia y sube su comprobante.
 - **Admin:**

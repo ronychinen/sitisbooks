@@ -43,13 +43,28 @@ create table if not exists public.books (
   cover_url   text,
   genre       text not null,
   condition   text not null,
-  note        text check (char_length(note) <= 300),
   district    text not null,
   status      text not null default 'disponible'
               check (status in ('disponible','reservado','entregado','retirado')),
   created_at  timestamptz not null default now()
 );
 create index if not exists books_status_idx on public.books(status, created_at desc);
+-- v3: se elimina la nota del libro (podía usarse para compartir datos de contacto)
+drop view if exists public.catalog;
+drop view if exists public.my_books;
+alter table public.books drop column if exists note;
+drop function if exists public.publish_book(text, text, text, text, text, text);
+
+-- Bloquea datos de contacto en título y autor: más de 5 dígitos en total, correos, @usuarios, enlaces o redes sociales.
+create or replace function public.contact_violation(t text) returns text
+language sql immutable as $$
+  select case
+    when length(regexp_replace(coalesce(t,''), '[^0-9]', '', 'g')) > 5 then 'no puede tener más de 5 números en total'
+    when t ~ '@' then 'no puede incluir correos ni usuarios (@)'
+    when t ~* '(https?://|www\.|\.(com|pe|net|org|io|me|ly)\M)' then 'no puede incluir enlaces'
+    when t ~* '\m(instagram|insta|facebook|fb|tiktok|twitter|whatsapp|wsp|wasap|telegram|ig|linkedin|youtube|snapchat|wa\.me)\M' then 'no puede mencionar redes sociales'
+  end
+$$;
 
 -- ---------- Intercambios ----------
 create table if not exists public.requests (
@@ -135,14 +150,18 @@ end $$;
 
 -- ---------- Libros ----------
 create or replace function public.publish_book(
-  p_title text, p_author text, p_cover_url text, p_genre text, p_condition text, p_note text
+  p_title text, p_author text, p_cover_url text, p_genre text, p_condition text
 ) returns uuid language plpgsql security definer set search_path = public as $$
-declare v_district text; v_id uuid;
+declare v_district text; v_id uuid; v_err text;
 begin
+  v_err := public.contact_violation(p_title);
+  if v_err is not null then raise exception 'El título %', v_err; end if;
+  v_err := public.contact_violation(p_author);
+  if v_err is not null then raise exception 'El autor %', v_err; end if;
   select district into v_district from public.profiles where id = auth.uid();
   if v_district is null then raise exception 'Completa tu perfil antes de publicar'; end if;
-  insert into public.books (owner_id, title, author, cover_url, genre, condition, note, district)
-  values (auth.uid(), trim(p_title), trim(p_author), nullif(p_cover_url,''), p_genre, p_condition, nullif(trim(p_note),''), v_district)
+  insert into public.books (owner_id, title, author, cover_url, genre, condition, district)
+  values (auth.uid(), trim(p_title), trim(p_author), nullif(p_cover_url,''), p_genre, p_condition, v_district)
   returning id into v_id;
   return v_id;
 end $$;
@@ -269,13 +288,13 @@ grant execute on function public.save_profile, public.publish_book, public.withd
 revoke select on public.books from anon, authenticated;
 
 create or replace view public.catalog as
-  select id, title, author, cover_url, genre, condition, note, created_at,
+  select id, title, author, cover_url, genre, condition, created_at,
          (owner_id = auth.uid()) as is_mine
   from public.books
   where status = 'disponible';
 
 create or replace view public.my_books as
-  select id, title, author, cover_url, genre, condition, note, status, created_at
+  select id, title, author, cover_url, genre, condition, status, created_at
   from public.books
   where owner_id = auth.uid() and status <> 'retirado';
 

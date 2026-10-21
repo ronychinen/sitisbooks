@@ -28,7 +28,6 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <p className="eyebrow">{b.genre}</p>
           <h1 style={{ fontSize: 32 }}>{b.title}</h1>
           <p className="muted" style={{ marginTop: 4 }}>{b.author} · {b.condition}</p>
-          {b.note && <p style={{ marginTop: 10 }}>{b.note}</p>}
         </div>
         <div className="panel cost">
           <span>Crédito</span><span className="n">1 de {profile.credits}</span>

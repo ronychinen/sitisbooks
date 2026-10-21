@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { CONDITIONS, GENRES } from "@/lib/constants";
+import { CONDITIONS, GENRES, contactViolation } from "@/lib/constants";
 import BookCover from "@/components/BookCover";
 
 type Candidate = { url: string; source: string; title: string; author: string; year?: string };
@@ -15,7 +15,6 @@ export default function DonateForm() {
   const [author, setAuthor] = useState("");
   const [genre, setGenre] = useState("");
   const [condition, setCondition] = useState("");
-  const [note, setNote] = useState("");
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
@@ -26,7 +25,11 @@ export default function DonateForm() {
   const [done, setDone] = useState("");
   const lastQuery = useRef("");
 
+  const titleErr = title.trim() ? contactViolation(title) : null;
+  const authorErr = author.trim() ? contactViolation(author) : null;
+
   async function search() {
+    if (titleErr || authorErr) return;
     const key = `${title.trim()}|${author.trim()}`;
     if (title.trim().length < 2 || key === lastQuery.current) return;
     lastQuery.current = key;
@@ -41,7 +44,7 @@ export default function DonateForm() {
 
   // Busca sola cuando el usuario deja de escribir título y autor
   useEffect(() => {
-    if (title.trim().length < 2 || author.trim().length < 2) return;
+    if (title.trim().length < 2 || author.trim().length < 2 || titleErr || authorErr) return;
     const t = setTimeout(search, 900);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -63,16 +66,17 @@ export default function DonateForm() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (titleErr || authorErr) { setError("Corrige el título o el autor antes de publicar."); return; }
     if (!cover) { setError("Confirma la portada o elige publicar sin portada."); return; }
     setBusy(true); setError("");
     const { error } = await supabase.rpc("publish_book", {
       p_title: title, p_author: author, p_cover_url: cover.kind === "none" ? "" : cover.url,
-      p_genre: genre, p_condition: condition, p_note: note,
+      p_genre: genre, p_condition: condition,
     });
     setBusy(false);
-    if (error) { setError("No pudimos publicar el libro. Inténtalo de nuevo."); return; }
+    if (error) { setError(error.message || "No pudimos publicar el libro. Inténtalo de nuevo."); return; }
     setDone(title);
-    setTitle(""); setAuthor(""); setGenre(""); setCondition(""); setNote("");
+    setTitle(""); setAuthor(""); setGenre(""); setCondition("");
     setCandidates(null); setPicked(null); setCover(null); lastQuery.current = "";
     router.refresh();
   }
@@ -83,8 +87,10 @@ export default function DonateForm() {
     <form className="stack" onSubmit={submit}>
       {done && <p className="note">Publicaste “{done}”. Ya aparece en el catálogo.</p>}
       <div className="grid2">
-        <label>Título<input id="title" required maxLength={160} value={title} onChange={(e) => { setTitle(e.target.value); setDone(""); }} onBlur={search} /></label>
-        <label>Autor<input id="author" required maxLength={120} value={author} onChange={(e) => setAuthor(e.target.value)} onBlur={search} /></label>
+        <label>Título<input id="title" required maxLength={160} aria-invalid={!!titleErr} value={title} onChange={(e) => { setTitle(e.target.value); setDone(""); }} onBlur={search} />
+          {titleErr && <span className="error">El título {titleErr}.</span>}</label>
+        <label>Autor<input id="author" required maxLength={120} aria-invalid={!!authorErr} value={author} onChange={(e) => setAuthor(e.target.value)} onBlur={search} />
+          {authorErr && <span className="error">El autor {authorErr}.</span>}</label>
       </div>
 
       {/* Paso de portada */}
@@ -142,9 +148,9 @@ export default function DonateForm() {
           </select>
         </label>
       </div>
-      <label>Nota (opcional)<textarea id="note" maxLength={300} placeholder="Edición, idioma, subrayados…" value={note} onChange={(e) => setNote(e.target.value)} /></label>
       {error && <p className="error">{error}</p>}
-      <button className="btn" disabled={busy || !cover}>{busy ? "Publicando…" : "Publicar libro"}</button>
+      <p className="muted" style={{ fontSize: 13 }}>Por tu seguridad, no incluyas teléfonos, correos ni redes sociales: Sitisbooks coordina todo por ti.</p>
+      <button className="btn" disabled={busy || !cover || !!titleErr || !!authorErr}>{busy ? "Publicando…" : "Publicar libro"}</button>
     </form>
   );
 }

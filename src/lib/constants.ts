@@ -18,12 +18,12 @@ export const ADMIN_FLOW = ["pagado", "coordinando", "en_camino", "entregado"] as
 
 export type Book = {
   id: string; owner_id: string; title: string; author: string; cover_url: string | null;
-  genre: string; condition: string; note: string | null; district: string; status: string; created_at: string;
+  genre: string; condition: string; district: string; status: string; created_at: string;
 };
 /** Libro del catálogo público: sin datos del donante. */
 export type CatalogBook = {
   id: string; title: string; author: string; cover_url: string | null; genre: string; condition: string;
-  note: string | null; created_at: string; is_mine: boolean;
+  created_at: string; is_mine: boolean;
 };
 /** Libro propio (vista my_books). */
 export type MyBook = Omit<CatalogBook, "is_mine"> & { status: string };
@@ -44,6 +44,15 @@ export type Settings = {
   id: number; fee: number; tariffs: Record<string, number>; default_tariff: number;
   yape_number: string | null; yape_holder: string | null; bank_info: string | null;
 };
+
+/** Igual que public.contact_violation en la base de datos: bloquea datos de contacto en título y autor. */
+export function contactViolation(t: string): string | null {
+  if ((t.match(/\d/g) ?? []).length > 5) return "no puede tener más de 5 números en total";
+  if (t.includes("@")) return "no puede incluir correos ni usuarios (@)";
+  if (/(https?:\/\/|www\.|\.(com|pe|net|org|io|me|ly)\b)/i.test(t)) return "no puede incluir enlaces";
+  if (/(^|[^\p{L}\d])(instagram|insta|facebook|fb|tiktok|twitter|whatsapp|wsp|wasap|telegram|ig|linkedin|youtube|snapchat|wa\.me)(?=$|[^\p{L}\d])/iu.test(t)) return "no puede mencionar redes sociales";
+  return null;
+}
 
 export const soles = (n: number | string | null | undefined) => "S/ " + Number(n || 0).toFixed(2);
 export const fmtD = (v: string | null | undefined) =>
