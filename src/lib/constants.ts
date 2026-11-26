@@ -23,10 +23,17 @@ export type Book = {
 /** Libro del catálogo público: sin datos del donante. */
 export type CatalogBook = {
   id: string; title: string; author: string; cover_url: string | null; genre: string; condition: string;
-  created_at: string; is_mine: boolean;
+  created_at: string; is_mine: boolean; book_key: string;
 };
+/** Una tarjeta del catálogo: todos los ejemplares disponibles del mismo libro (vista catalog_groups). */
+export type CatalogGroup = {
+  book_key: string; copies: number; my_copies: number; created_at: string;
+  title: string; author: string; genre: string; condition: string; cover_url: string | null; request_id: string | null;
+};
+export const CONDITION_RANK: Record<string, number> = { "Nuevo": 1, "Como nuevo": 2, "Buen estado": 3, "Usado": 4 };
+export const copiesLabel = (n: number) => `${n} ${n === 1 ? "ejemplar" : "ejemplares"}`;
 /** Libro propio (vista my_books). */
-export type MyBook = Omit<CatalogBook, "is_mine"> & { status: string };
+export type MyBook = Omit<CatalogBook, "is_mine" | "book_key"> & { status: string };
 /** Intercambio visto por un usuario (vista my_requests): nunca incluye datos del otro usuario. */
 export type MyRequest = {
   id: string; role: "recibido" | "donado"; book_title: string; book_cover: string | null; status: string;

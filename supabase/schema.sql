@@ -424,11 +424,45 @@ grant select on public.addresses to authenticated;
 -- que no exponen quién dona, quién recibe, distritos ni datos de otros usuarios.
 revoke select on public.books from anon, authenticated;
 
+-- v7: clave para agrupar ejemplares del mismo libro (título + autor, sin tildes ni mayúsculas)
+create or replace function public.book_key(p_title text, p_author text) returns text
+language sql immutable as $$
+  select trim(regexp_replace(translate(lower(coalesce(p_title,'')), 'áéíóúüñàèìòùâêîôû', 'aeiouunaeiouaeiou'), '[^a-z0-9]+', ' ', 'g'))
+      || '|' ||
+         trim(regexp_replace(translate(lower(coalesce(p_author,'')), 'áéíóúüñàèìòùâêîôû', 'aeiouunaeiouaeiou'), '[^a-z0-9]+', ' ', 'g'))
+$$;
+
 create or replace view public.catalog as
   select id, title, author, cover_url, genre, condition, created_at,
-         (owner_id = auth.uid()) as is_mine
+         (owner_id = auth.uid()) as is_mine,
+         public.book_key(title, author) as book_key
   from public.books
   where status = 'disponible';
+
+-- Catálogo agrupado: una tarjeta por libro con la cantidad de ejemplares disponibles.
+-- request_id = el ejemplar a pedir (de otra persona, mejor estado primero).
+create or replace view public.catalog_groups as
+  with b as (
+    select id, title, author, cover_url, genre, condition, created_at, owner_id,
+           public.book_key(title, author) as book_key,
+           case condition when 'Nuevo' then 1 when 'Como nuevo' then 2 when 'Buen estado' then 3 else 4 end as rank
+    from public.books where status = 'disponible'
+  ), g as (
+    select book_key, count(*)::int as copies,
+           count(*) filter (where owner_id = auth.uid())::int as my_copies,
+           max(created_at) as created_at
+    from b group by book_key
+  )
+  select g.book_key, g.copies, g.my_copies, g.created_at,
+         rep.title, rep.author, rep.genre, rep.condition,
+         coalesce(rep.cover_url, (select b2.cover_url from b b2 where b2.book_key = g.book_key and b2.cover_url is not null order by b2.created_at desc limit 1)) as cover_url,
+         (select b3.id from b b3 where b3.book_key = g.book_key and b3.owner_id is distinct from auth.uid() order by b3.rank, b3.created_at limit 1) as request_id
+  from g
+  cross join lateral (
+    select b1.* from b b1 where b1.book_key = g.book_key
+    order by (b1.owner_id is distinct from auth.uid()) desc, b1.rank, (b1.cover_url is not null) desc, b1.created_at
+    limit 1
+  ) rep;
 
 create or replace view public.my_books as
   select id, title, author, cover_url, genre, condition, status, created_at
@@ -456,7 +490,9 @@ create or replace view public.my_requests as
   from public.requests r
   where r.requester_id = auth.uid() or r.donor_id = auth.uid();
 
-grant select on public.catalog to anon, authenticated;
+grant select on public.catalog, public.catalog_groups to anon, authenticated;
+revoke execute on function public.book_key from public;
+grant execute on function public.book_key to anon, authenticated;
 grant select on public.my_books, public.my_requests to authenticated;
 
 -- ---------- Primer admin (ejecutar DESPUÉS de crear tu perfil en la web) ----------

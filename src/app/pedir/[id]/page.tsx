@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getAddresses, requireProfile } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
 import GenreTag from "@/components/GenreTag";
-import { type CatalogBook, type Settings } from "@/lib/constants";
+import { CONDITION_RANK, copiesLabel, type CatalogBook, type Settings } from "@/lib/constants";
 import RequestPanel from "./RequestPanel";
 
 export const metadata = { title: "Pedir libro", robots: { index: false, follow: false } };
@@ -21,6 +21,11 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     return <div className="empty"><h3>Este libro ya no está disponible</h3><p>Otra persona lo pidió o el donante lo retiró.</p><Link className="btn" href="/">Ver otros libros</Link></div>;
   }
   const b = book as CatalogBook, s = settings as Settings | null;
+  // Otros ejemplares del mismo libro (de otras personas), mejor estado primero
+  const { data: sameBook } = await supabase.from("catalog").select("id, condition, is_mine, created_at").eq("book_key", b.book_key);
+  const copies = ((sameBook ?? []) as Pick<CatalogBook, "id" | "condition" | "is_mine" | "created_at">[])
+    .filter((c) => !c.is_mine)
+    .sort((x, y) => (CONDITION_RANK[x.condition] ?? 9) - (CONDITION_RANK[y.condition] ?? 9) || x.created_at.localeCompare(y.created_at));
   const own = b.is_mine, unavailable = false, noCredits = profile.credits < 1;
 
   return (
@@ -32,6 +37,16 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <h1 style={{ fontSize: 32 }}>{b.title}</h1>
           <p className="muted" style={{ marginTop: 4 }}>{b.author} · {b.condition}</p>
         </div>
+        {copies.length > 1 && (
+          <div className="stack" style={{ gap: 8 }}>
+            <b style={{ fontSize: 14 }}>{copiesLabel(copies.length)} disponibles · elige el estado</b>
+            <div className="row" style={{ gap: 8 }}>
+              {copies.map((c) => (
+                <Link key={c.id} href={`/pedir/${c.id}`} className={`opt${c.id === b.id ? " on" : ""}`} aria-current={c.id === b.id ? "true" : undefined}>{c.condition}</Link>
+              ))}
+            </div>
+          </div>
+        )}
         <RequestPanel bookId={b.id} credits={profile.credits} settings={s} addresses={addresses} canRequest={!own && !unavailable && !noCredits} />
         <p className="note">Pagas por Yape o transferencia en el siguiente paso. Reservamos el libro para ti mientras subes tu comprobante. Sitisbooks coordina el recojo y la entrega; no compartimos tus datos con el donante.</p>
         {own ? <p className="error">Este libro es tuyo.</p>

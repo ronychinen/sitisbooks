@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
 import GenreTag from "@/components/GenreTag";
-import { GENRES, type CatalogBook } from "@/lib/constants";
+import { GENRES, copiesLabel, type CatalogGroup } from "@/lib/constants";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 
 const jsonLd = {
@@ -18,14 +18,14 @@ export const dynamic = "force-dynamic";
 export default async function Home({ searchParams }: { searchParams: Promise<{ q?: string; g?: string }> }) {
   const { q = "", g = "" } = await searchParams;
   const { supabase, user } = await getSession();
-  let query = supabase.from("catalog").select("*").order("created_at", { ascending: false }).limit(120);
+  let query = supabase.from("catalog_groups").select("*").order("created_at", { ascending: false }).limit(120);
   if (g) query = query.eq("genre", g);
   if (q) {
     const safe = q.replace(/[%,()]/g, " ").trim();
     if (safe) query = query.or(`title.ilike.%${safe}%,author.ilike.%${safe}%`);
   }
   const { data } = await query;
-  const books = (data ?? []) as CatalogBook[];
+  const books = (data ?? []) as CatalogGroup[];
   const filtered = !!(q || g);
 
   return (
@@ -63,14 +63,14 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
       ) : (
         <div className="shelf">
           {books.map((b) => (
-            <article className="book" key={b.id}>
+            <article className="book" key={b.book_key}>
               <BookCover title={b.title} author={b.author} url={b.cover_url} tag={b.condition} />
               <div className="title" title={b.title}>{b.title}</div>
               <div className="author" title={b.author}>{b.author}</div>
-              <div><GenreTag genre={b.genre} /></div>
-              {b.is_mine
-                ? <span className="chip s-disponible push">Tu libro</span>
-                : <Link className="btn sm push" href={`/pedir/${b.id}`}>Pedir este libro</Link>}
+              <div className="row" style={{ gap: 6 }}><GenreTag genre={b.genre} /><span className="copies">{copiesLabel(b.copies)}</span></div>
+              {b.request_id
+                ? <Link className="btn sm push" href={`/pedir/${b.request_id}`}>Pedir este libro</Link>
+                : <span className="chip s-disponible push">Tu libro</span>}
             </article>
           ))}
         </div>
