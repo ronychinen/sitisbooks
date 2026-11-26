@@ -41,7 +41,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
         <div className="steps">
           <div><span><b>Publica</b> los libros que quieres donar. Buscamos la portada por ti.</span></div>
           <div><span><b>Gana 1 crédito</b> por cada libro entregado. Al registrarte recibes 1 de bienvenida.</span></div>
-          <div><span><b>Pide un libro</b>: usas 1 crédito y pagas delivery + comisión por Yape o transferencia. Sitisbooks coordina recojo y entrega: tus datos nunca se comparten con otros usuarios.</span></div>
+          <div><span><b>Pide un libro</b>: usas 1 crédito y pagas delivery + comisión por Yape o transferencia. Sitisbooks coordina recojo y entrega.<span className="para">Tus datos nunca se comparten con otros usuarios.</span></span></div>
         </div>
       </section>
 

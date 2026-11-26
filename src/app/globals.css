@@ -146,3 +146,4 @@ td input{width:90px;padding:5px 8px}
 .copies{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;border:1px solid var(--line);color:var(--ink);background:var(--surface);white-space:nowrap}
 .opt{display:inline-block;font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);text-decoration:none;color:var(--ink)}
 .opt.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.steps .para{display:block;margin-top:6px}
