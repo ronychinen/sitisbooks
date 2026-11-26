@@ -282,6 +282,13 @@ grant execute on function public.save_profile, public.publish_book, public.withd
   public.submit_payment, public.cancel_my_request, public.admin_review_payment, public.admin_update_request,
   public.admin_set_credits to authenticated;
 
+-- ---------- Permisos de tablas (proyectos Supabase desde mayo 2026 no exponen tablas por defecto) ----------
+-- RLS sigue limitando qué filas ve cada usuario.
+grant select on public.profiles to authenticated;
+grant select on public.settings to anon, authenticated;
+grant update on public.settings to authenticated;
+grant select on public.requests to authenticated;
+
 -- ---------- Privacidad: vistas seguras para usuarios ----------
 -- Los usuarios NUNCA leen las tablas books/requests directamente: solo estas vistas,
 -- que no exponen quién dona, quién recibe, distritos ni datos de otros usuarios.
