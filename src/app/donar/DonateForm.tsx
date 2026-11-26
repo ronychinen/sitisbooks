@@ -24,6 +24,11 @@ export default function DonateForm() {
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
   const lastQuery = useRef("");
+  const [sugs, setSugs] = useState<Candidate[]>([]);
+  const [sugOpen, setSugOpen] = useState(false);
+  const [sugIdx, setSugIdx] = useState(-1);
+  const sugReq = useRef(0);
+  const typedTitle = useRef(false);
 
   const titleErr = title.trim() ? contactViolation(title) : null;
   const authorErr = author.trim() ? contactViolation(author) : null;
@@ -49,6 +54,43 @@ export default function DonateForm() {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, author]);
+
+  // Sugerencias de títulos mientras se escribe
+  useEffect(() => {
+    const q = title.trim();
+    if (!typedTitle.current || q.length < 3 || titleErr) { setSugs([]); return; }
+    const id = ++sugReq.current;
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/covers?suggest=1&title=${encodeURIComponent(q)}`);
+        const j = await r.json();
+        if (id !== sugReq.current) return;
+        setSugs(j.candidates ?? []); setSugIdx(-1); setSugOpen(true);
+      } catch { if (id === sugReq.current) setSugs([]); }
+    }, 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title]);
+
+  function chooseSuggestion(s: Candidate) {
+    const t = contactViolation(s.title) ? title.trim() : s.title.trim().slice(0, 160);
+    const a = s.author && !contactViolation(s.author) ? s.author.trim().slice(0, 120) : author.trim();
+    typedTitle.current = false; sugReq.current++;
+    setSugOpen(false); setSugs([]);
+    setTitle(t); setAuthor(a); setDone("");
+    lastQuery.current = `${t}|${a}`;
+    setCover(null);
+    setCandidates([s, ...sugs.filter((c) => c.url !== s.url && c.author === s.author)]);
+    setPicked(s.url);
+  }
+
+  function onTitleKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!sugOpen || !sugs.length) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setSugIdx((i) => (i + 1) % sugs.length); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setSugIdx((i) => (i <= 0 ? sugs.length - 1 : i - 1)); }
+    else if (e.key === "Enter" && sugIdx >= 0) { e.preventDefault(); chooseSuggestion(sugs[sugIdx]); }
+    else if (e.key === "Escape") setSugOpen(false);
+  }
 
   // Al elegir una portada, completa el autor con el de esa edición (sin relanzar la búsqueda)
   function pick(c: Candidate) {
@@ -88,6 +130,7 @@ export default function DonateForm() {
     setDone(title);
     setTitle(""); setAuthor(""); setGenre(""); setCondition("");
     setCandidates(null); setPicked(null); setCover(null); lastQuery.current = "";
+    typedTitle.current = false; setSugs([]); setSugOpen(false);
     router.refresh();
   }
 
@@ -97,7 +140,21 @@ export default function DonateForm() {
     <form className="stack" onSubmit={submit}>
       {done && <p className="note">Publicaste “{done}”. Ya aparece en el catálogo.</p>}
       <div className="grid2">
-        <label>Título<input id="title" required maxLength={160} aria-invalid={!!titleErr} value={title} onChange={(e) => { setTitle(e.target.value); setDone(""); }} onBlur={search} />
+        <label className="ac">Título<input id="title" required maxLength={160} autoComplete="off" role="combobox" aria-expanded={sugOpen && sugs.length > 0} aria-controls="title-sugs" aria-invalid={!!titleErr} value={title}
+            onChange={(e) => { typedTitle.current = true; setTitle(e.target.value); setDone(""); }}
+            onKeyDown={onTitleKey} onFocus={() => sugs.length && setSugOpen(true)}
+            onBlur={() => { setSugOpen(false); search(); }} />
+          {sugOpen && sugs.length > 0 && (
+            <ul className="ac-list" id="title-sugs" role="listbox">
+              {sugs.map((s, i) => (
+                <li key={s.url} role="option" aria-selected={i === sugIdx} onMouseDown={(e) => { e.preventDefault(); chooseSuggestion(s); }} onMouseEnter={() => setSugIdx(i)}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.url.replace("/600x600bb.", "/100x100bb.")} alt="" />
+                  <span><b>{s.title}</b><small>{s.author}{s.year ? ` · ${s.year}` : ""}</small></span>
+                </li>
+              ))}
+            </ul>
+          )}
           {titleErr && <span className="error">El título {titleErr}.</span>}</label>
         <label>Autor<input id="author" required maxLength={120} aria-invalid={!!authorErr} value={author} onChange={(e) => setAuthor(e.target.value)} onBlur={search} />
           {authorErr && <span className="error">El autor {authorErr}.</span>}</label>

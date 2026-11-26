@@ -80,6 +80,13 @@ export async function GET(req: NextRequest) {
   const title = (req.nextUrl.searchParams.get("title") || "").trim().slice(0, 160);
   const author = (req.nextUrl.searchParams.get("author") || "").trim().slice(0, 120);
   if (title.length < 2) return NextResponse.json({ candidates: [] });
+  // Sugerencias mientras se escribe: solo Apple Books (rápido), un resultado por título + autor
+  if (req.nextUrl.searchParams.get("suggest")) {
+    const list = await appleBooks(title, "").catch(() => []);
+    const seen = new Set<string>();
+    const out = list.filter((c) => { const k = norm(`${c.title}|${c.author}`); if (seen.has(k)) return false; seen.add(k); return true; });
+    return NextResponse.json({ candidates: out.slice(0, 6) }, { headers: { "Cache-Control": "public, max-age=3600" } });
+  }
   const results = await Promise.allSettled([appleBooks(title, author), openLibrary(title, author), googleBooks(title, author)]);
   const lists = results.map((r) => (r.status === "fulfilled" ? r.value : []));
   // Intercala las fuentes (Apple primero) y quita duplicados por URL
