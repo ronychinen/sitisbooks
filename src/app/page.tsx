@@ -24,28 +24,69 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
     const safe = q.replace(/[%,()]/g, " ").trim();
     if (safe) query = query.or(`title.ilike.%${safe}%,author.ilike.%${safe}%`);
   }
-  const { data } = await query;
+  const [{ data }, { data: last }] = await Promise.all([
+    query,
+    supabase.from("catalog_groups").select("*").order("created_at", { ascending: false }).limit(3),
+  ]);
+  const latest = (last ?? []) as CatalogGroup[];
   const books = (data ?? []) as CatalogGroup[];
   const filtered = !!(q || g);
 
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <section className="hero">
-        <div>
-          <p className="eyebrow">Intercambio de libros · Lima Metropolitana</p>
-          <h1>Dona los libros que ya leíste. Recibe los que quieres leer.</h1>
-          <p className="lead">Cada libro que donas te da 1 crédito para pedir otro. Solo pagas el delivery a tu distrito y una comisión fija por intercambio.</p>
-          {!user && <div className="row" style={{ marginTop: 18 }}><Link className="btn" href="/ingresar?next=/donar">Crear cuenta gratis</Link><span className="muted">y recibe 1 crédito de bienvenida</span></div>}
+      <section className="lp-hero">
+        <div className="lp-copy">
+          <span className="lp-badge"><i aria-hidden="true" />Intercambio de libros en Lima y Callao</span>
+          <h1 className="lp-title">Dona los libros que ya leíste. <span>Recibe los que quieres leer.</span></h1>
+          <p className="lp-lead">Cada libro que donas te da 1 crédito para pedir otro. Solo pagas el delivery y una comisión fija. Nosotros coordinamos todo.</p>
+          <div className="lp-ctas">
+            {user
+              ? <Link className="btn lg" href="/donar">Donar un libro</Link>
+              : <Link className="btn lg" href="/ingresar?next=/donar">Crear cuenta gratis</Link>}
+            <a className="btn lg ghost" href="#catalogo">Ver catálogo</a>
+          </div>
+          {!user && <span className="lp-note">Al registrarte recibes <b>1 crédito de bienvenida</b>.</span>}
         </div>
-        <div className="steps">
-          <div><span><b>Publica</b> los libros que quieres donar. Buscamos la portada por ti.</span></div>
-          <div><span><b>Gana 1 crédito</b> por cada libro entregado. Al registrarte recibes 1 de bienvenida.</span></div>
-          <div><span><b>Pide un libro</b>: usas 1 crédito y pagas delivery + comisión por Yape o transferencia. Sitisbooks coordina recojo y entrega.<span className="para">Tus datos nunca se comparten con otros usuarios.</span></span></div>
+        <div className="lp-stack" aria-label="Últimos libros publicados">
+          {[0, 1, 2].map((i) => {
+            const b = latest[i];
+            const slot = `lp-book lp-b${i + 1}`;
+            if (!b) return <div key={i} className={`${slot} lp-empty`} aria-hidden="true"><span>Tu libro aquí</span></div>;
+            const cover = <BookCover title={b.title} author={b.author} url={b.cover_url} />;
+            return b.request_id
+              ? <Link key={b.book_key} href={`/pedir/${b.request_id}`} className={slot} title={`${b.title} · ${b.author}`}>{cover}</Link>
+              : <div key={b.book_key} className={slot} title={`${b.title} · ${b.author}`}>{cover}</div>;
+          })}
+          <div className="lp-toast" aria-hidden="true"><span>+1</span><p><b>Crédito ganado</b><br />Tu libro llegó a su nuevo lector</p></div>
         </div>
       </section>
 
-      <div className="row between" style={{ marginBottom: 14 }}>
+      <section className="lp-how" id="como-funciona">
+        <h2>Así funciona</h2>
+        <div className="bento">
+          <div className="b-dark">
+            <span className="b-k">01 · Publica</span>
+            <div><b>Escribe el título y elegimos la portada por ti.</b><p>Sin fotos ni descripciones largas: en menos de un minuto tu libro está en el catálogo.</p></div>
+          </div>
+          <div className="b-card">
+            <span className="b-k">02 · Gana</span>
+            <b>1 crédito por cada libro entregado</b>
+            <p>Se suma cuando tu libro llega a su nuevo lector. Al registrarte recibes 1 de bienvenida.</p>
+          </div>
+          <div className="b-card b-soft">
+            <span className="b-k">03 · Pide</span>
+            <b>Usa tu crédito y paga solo el delivery</b>
+            <p>Más una comisión fija, por Yape o transferencia.</p>
+          </div>
+          <div className="b-card b-wide">
+            <span className="b-ico" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg></span>
+            <div><b>Tus datos nunca se comparten con otros usuarios.</b><p>Sitisbooks coordina el recojo y la entrega por ti.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <div className="row between lp-shelf-head" id="catalogo">
         <h2>Libros disponibles</h2>
       </div>
       <form className="toolbar" method="get">
@@ -75,6 +116,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
           ))}
         </div>
       )}
+
+      <section className="lp-cta">
+        <div><b>¿Tienes libros en casa que ya leíste?</b><p>Publica el primero hoy{user ? " y gana 1 crédito cuando llegue a su nuevo lector" : " y empieza con 1 crédito de bienvenida"}.</p></div>
+        <Link className="btn lg light" href={user ? "/donar" : "/ingresar?next=/donar"}>Donar un libro</Link>
+      </section>
     </>
   );
 }

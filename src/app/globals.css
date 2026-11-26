@@ -156,3 +156,57 @@ td input{width:90px;padding:5px 8px}
 .pc-pago_en_revision{color:var(--info)} .pc-aprobado{color:var(--ok)} .pc-rechazado{color:var(--bad)}
 button.opt{font:inherit;font-size:13px;font-weight:600;cursor:pointer}
 .bank{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:0;font-size:14px}.bank dt{color:var(--muted)}.bank dd{margin:0;font-weight:600}.bank .sel{font-family:var(--f-mono),monospace;user-select:all}
+
+/* ---------- Landing (opción A · Bento) ---------- */
+.btn.lg{padding:14px 22px;font-size:16px;border-radius:12px;font-weight:700}
+.btn.lg.ghost{background:var(--surface)}
+.btn.light{background:#fff;color:var(--ink)}
+.lp-hero{display:flex;flex-wrap:wrap;gap:48px;align-items:center;padding:40px 0 48px}
+.lp-copy{flex:1 1 460px;min-width:0;display:flex;flex-direction:column;gap:20px}
+.lp-badge{align-self:flex-start;display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:var(--accent-soft);color:#1E4FB0;font-size:13px;font-weight:700}
+.lp-badge i{width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.lp-title{font-size:clamp(40px,5.6vw,64px);line-height:1.03;letter-spacing:-.01em}
+.lp-title span{color:var(--accent)}
+.lp-lead{margin:0;font-size:19px;line-height:1.55;color:var(--muted);max-width:520px}
+.lp-ctas{display:flex;gap:12px;flex-wrap:wrap}
+.lp-note{font-size:14px;color:var(--muted)}.lp-note b{color:var(--ink)}
+.lp-stack{flex:1 1 400px;min-width:0;position:relative;height:440px}
+.lp-book{position:absolute;display:block;border-radius:6px 14px 14px 6px;box-shadow:0 26px 50px -24px rgba(22,33,58,.5);transition:transform .25s ease}
+.lp-book .cover{border-radius:6px 14px 14px 6px;box-shadow:none}
+.lp-b1{left:4%;top:44px;width:42%;max-width:200px;transform:rotate(-9deg);z-index:1}
+.lp-b2{left:32%;top:6px;width:46%;max-width:215px;transform:rotate(3deg);z-index:2}
+.lp-b3{right:0;top:120px;width:40%;max-width:190px;transform:rotate(11deg);z-index:1}
+a.lp-book:hover{transform:rotate(0) translateY(-6px) scale(1.03);z-index:3}
+.lp-empty{aspect-ratio:2/3;background:var(--accent-soft);border:2px dashed #B9CFF3;display:grid;place-items:center;color:#1E4FB0;font-weight:700;font-size:14px;box-shadow:none}
+.lp-toast{position:absolute;left:10%;bottom:4px;z-index:4;display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:14px;background:var(--surface);border:1px solid var(--line);box-shadow:0 16px 30px -18px rgba(22,33,58,.35)}
+.lp-toast span{width:34px;height:34px;border-radius:50%;background:#E6F6EE;color:#1E6B45;display:grid;place-items:center;font-weight:800;flex:none}
+.lp-toast p{margin:0;font-size:14px;line-height:1.3;color:var(--muted)}.lp-toast b{color:var(--ink)}
+.lp-how{padding:16px 0 48px}
+.lp-how h2,.lp-shelf-head h2{font-size:clamp(28px,3.4vw,36px)}
+.lp-how h2{margin-bottom:20px}
+.lp-shelf-head{margin-bottom:16px;scroll-margin-top:90px}
+.bento{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.bento > div{border-radius:22px;padding:26px;display:flex;flex-direction:column;gap:10px}
+.bento b{font-size:22px;line-height:1.2}
+.bento p{margin:0;font-size:15px;line-height:1.5;color:var(--muted)}
+.b-k{font-size:13px;font-weight:700;color:var(--accent)}
+.b-dark{grid-row:span 2;background:var(--ink);color:#fff;justify-content:space-between;min-height:320px}
+.b-dark .b-k{color:var(--highlight)}
+.b-dark b{display:block;font-size:28px;margin-bottom:10px}
+.b-dark p{color:#C6D2E6;font-size:16px}
+.b-card{background:var(--surface);border:1px solid var(--line)}
+.b-soft{background:var(--accent-soft);border-color:transparent}.b-soft .b-k{color:#1E4FB0}.b-soft p{color:#3B4A66}
+.b-wide{grid-column:span 2;flex-direction:row!important;align-items:center;gap:18px!important}
+.b-wide b{font-size:18px}
+.b-ico{width:48px;height:48px;border-radius:14px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;flex:none}
+.lp-cta{margin-top:56px;border-radius:28px;background:var(--accent);color:#fff;padding:44px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.lp-cta b{display:block;font-family:var(--f-display),Georgia,serif;font-weight:400;font-size:clamp(28px,3.4vw,38px);line-height:1.1}
+.lp-cta p{margin:8px 0 0;font-size:17px;color:#DCE8FB}
+@media (max-width:760px){
+  .lp-hero{padding:16px 0 32px;gap:32px}
+  .lp-stack{height:340px}
+  .bento{grid-template-columns:minmax(0,1fr)}
+  .bento > div{grid-column:auto!important;grid-row:auto!important}
+  .b-dark{min-height:0}
+  .lp-cta{padding:28px}
+}
