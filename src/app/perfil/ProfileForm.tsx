@@ -10,7 +10,7 @@ export default function ProfileForm({ email, profile, next, isNew }: { email: st
   const router = useRouter();
   const [f, setF] = useState({
     first_name: profile?.first_name ?? "", last_name: profile?.last_name ?? "", phone: profile?.phone ?? "",
-    district: profile?.district ?? "", address: profile?.address ?? "", reference: profile?.reference ?? "",
+    district: profile?.district ?? "", address: profile?.address ?? "", reference: profile?.reference ?? "", unit: "",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -24,7 +24,7 @@ export default function ProfileForm({ email, profile, next, isNew }: { email: st
     const { error } = isNew
       ? await supabase.rpc("save_profile", {
           p_first_name: f.first_name, p_last_name: f.last_name, p_phone: f.phone,
-          p_district: f.district, p_address: f.address, p_reference: f.reference,
+          p_district: f.district, p_address: f.address, p_reference: f.reference, p_unit: f.unit,
         })
       : await supabase.rpc("update_contact", { p_first_name: f.first_name, p_last_name: f.last_name, p_phone: f.phone });
     setBusy(false);
@@ -51,7 +51,10 @@ export default function ProfileForm({ email, profile, next, isNew }: { email: st
         </label>}
       </div>
       {isNew && <>
-        <label>Dirección (recojo y entrega)<input id="address" required maxLength={160} autoComplete="street-address" placeholder="Av./Calle, número, dpto." value={f.address} onChange={set("address")} /></label>
+        <div className="grid2 addr-line">
+          <label>Dirección (recojo y entrega)<input id="address" required maxLength={160} autoComplete="street-address" placeholder="Av./Calle y número" value={f.address} onChange={set("address")} /></label>
+          <label>Dpto. / Oficina (opcional)<input id="unit" maxLength={30} placeholder="Dpto 501, Of. 302" value={f.unit} onChange={set("unit")} /></label>
+        </div>
         <label>Referencia (opcional)<input id="reference" maxLength={160} placeholder="Frente al parque, portón verde…" value={f.reference} onChange={set("reference")} /></label>
         <p className="muted" style={{ fontSize: 13, margin: 0 }}>La guardamos como “Casa”. Luego puedes agregar más direcciones (trabajo, departamento…).</p>
       </>}

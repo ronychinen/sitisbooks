@@ -2,10 +2,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ADDRESS_LABELS, DISTRICTS, type Address } from "@/lib/constants";
+import { ADDRESS_LABELS, DISTRICTS, fullAddress, type Address } from "@/lib/constants";
 
-type Draft = { id: string | null; label: string; district: string; address: string; reference: string; is_default: boolean };
-const EMPTY: Draft = { id: null, label: "", district: "", address: "", reference: "", is_default: false };
+type Draft = { id: string | null; label: string; district: string; address: string; unit: string; reference: string; is_default: boolean };
+const EMPTY: Draft = { id: null, label: "", district: "", address: "", unit: "", reference: "", is_default: false };
 const MAX = 5;
 
 export default function AddressBook({ addresses }: { addresses: Address[] }) {
@@ -21,7 +21,7 @@ export default function AddressBook({ addresses }: { addresses: Address[] }) {
     setBusy(true); setError("");
     const { error } = await supabase.rpc("save_address", {
       p_id: draft.id, p_label: draft.label, p_district: draft.district, p_address: draft.address,
-      p_reference: draft.reference, p_default: draft.is_default,
+      p_reference: draft.reference, p_default: draft.is_default, p_unit: draft.unit,
     });
     setBusy(false);
     if (error) { setError(error.message || "No pudimos guardar la dirección."); return; }
@@ -34,7 +34,7 @@ export default function AddressBook({ addresses }: { addresses: Address[] }) {
     if (error) { setError(error.message); return; }
     router.refresh();
   }
-  const makeDefault = (a: Address) => act(() => supabase.rpc("save_address", { p_id: a.id, p_label: a.label, p_district: a.district, p_address: a.address, p_reference: a.reference ?? "", p_default: true }));
+  const makeDefault = (a: Address) => act(() => supabase.rpc("save_address", { p_id: a.id, p_label: a.label, p_district: a.district, p_address: a.address, p_reference: a.reference ?? "", p_default: true, p_unit: a.unit ?? "" }));
   const remove = (a: Address) => { if (confirm(`¿Eliminar la dirección "${a.label}"?`)) act(() => supabase.rpc("delete_address", { p_id: a.id })); };
   const set = (k: keyof Draft) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setDraft((d) => d && { ...d, [k]: e.target.type === "checkbox" ? (e.target as HTMLInputElement).checked : e.target.value });
@@ -50,11 +50,11 @@ export default function AddressBook({ addresses }: { addresses: Address[] }) {
           <div className="addr" key={a.id}>
             <div>
               <b>{a.label}</b>{a.is_default && <span className="genre g-0" style={{ marginLeft: 8 }}>Predeterminada</span>}
-              <div className="muted" style={{ fontSize: 14 }}>{a.address}, {a.district}{a.reference ? ` · Ref.: ${a.reference}` : ""}</div>
+              <div className="muted" style={{ fontSize: 14 }}>{fullAddress(a)}, {a.district}{a.reference ? ` · Ref.: ${a.reference}` : ""}</div>
             </div>
             <div className="row" style={{ gap: 10 }}>
               {!a.is_default && <button type="button" className="linkbtn" disabled={busy} onClick={() => makeDefault(a)}>Hacer predeterminada</button>}
-              <button type="button" className="linkbtn" disabled={busy} onClick={() => setDraft({ id: a.id, label: a.label, district: a.district, address: a.address, reference: a.reference ?? "", is_default: a.is_default })}>Editar</button>
+              <button type="button" className="linkbtn" disabled={busy} onClick={() => setDraft({ id: a.id, label: a.label, district: a.district, address: a.address, unit: a.unit ?? "", reference: a.reference ?? "", is_default: a.is_default })}>Editar</button>
               {addresses.length > 1 && <button type="button" className="linkbtn" disabled={busy} onClick={() => remove(a)}>Eliminar</button>}
             </div>
           </div>
@@ -75,7 +75,10 @@ export default function AddressBook({ addresses }: { addresses: Address[] }) {
               </select>
             </label>
           </div>
-          <label>Dirección<input required maxLength={160} placeholder="Av./Calle, número, dpto." value={draft.address} onChange={set("address")} /></label>
+          <div className="grid2 addr-line">
+            <label>Dirección<input required maxLength={160} placeholder="Av./Calle y número" value={draft.address} onChange={set("address")} /></label>
+            <label>Dpto. / Oficina (opcional)<input maxLength={30} placeholder="Dpto 501, Of. 302" value={draft.unit} onChange={set("unit")} /></label>
+          </div>
           <label>Referencia (opcional)<input maxLength={160} placeholder="Frente al parque, portón verde…" value={draft.reference} onChange={set("reference")} /></label>
           {!(draft.id && draft.is_default) && (
             <label style={{ flexDirection: "row", alignItems: "center", gap: 8, fontWeight: 500 }}>

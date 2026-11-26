@@ -33,6 +33,8 @@ create table if not exists public.addresses (
   created_at  timestamptz not null default now()
 );
 create index if not exists addresses_user_idx on public.addresses(user_id);
+-- v5: departamento / oficina (opcional)
+alter table public.addresses add column if not exists unit text check (unit is null or char_length(unit) <= 30);
 -- Migración: cada perfil existente obtiene su dirección actual como "Casa" (predeterminada)
 insert into public.addresses (user_id, label, district, address, reference, is_default)
   select p.id, 'Casa', p.district, p.address, p.reference, true from public.profiles p
@@ -165,21 +167,23 @@ create policy "intercambios solo admin" on public.requests for select
 -- Toda escritura pasa por las funciones de abajo (security definer).
 
 -- ---------- Perfil ----------
+drop function if exists public.save_profile(text, text, text, text, text, text);
 create or replace function public.save_profile(
-  p_first_name text, p_last_name text, p_phone text, p_district text, p_address text, p_reference text
+  p_first_name text, p_last_name text, p_phone text, p_district text, p_address text, p_reference text, p_unit text default null
 ) returns void language plpgsql security definer set search_path = public as $$
 declare v_email text;
 begin
   if auth.uid() is null then raise exception 'Debes iniciar sesión'; end if;
   select email into v_email from auth.users where id = auth.uid();
   insert into public.profiles (id, email, first_name, last_name, phone, district, address, reference)
-  values (auth.uid(), v_email, trim(p_first_name), trim(p_last_name), p_phone, p_district, trim(p_address), nullif(trim(p_reference),''))
+  values (auth.uid(), v_email, trim(p_first_name), trim(p_last_name), p_phone, p_district,
+          concat_ws(', ', trim(p_address), nullif(left(trim(coalesce(p_unit,'')),30),'')), nullif(trim(p_reference),''))
   on conflict (id) do update set
     first_name = excluded.first_name, last_name = excluded.last_name, phone = excluded.phone,
     district = excluded.district, address = excluded.address, reference = excluded.reference;
   if not exists (select 1 from public.addresses where user_id = auth.uid()) then
-    insert into public.addresses (user_id, label, district, address, reference, is_default)
-    values (auth.uid(), 'Casa', p_district, trim(p_address), nullif(trim(p_reference),''), true);
+    insert into public.addresses (user_id, label, district, address, unit, reference, is_default)
+    values (auth.uid(), 'Casa', p_district, trim(p_address), nullif(left(trim(coalesce(p_unit,'')),30),''), nullif(trim(p_reference),''), true);
   end if;
 end $$;
 
@@ -201,12 +205,13 @@ begin
   select * into a from public.addresses where user_id = p_user order by is_default desc, created_at limit 1;
   if a.id is null then return; end if;
   update public.addresses set is_default = (id = a.id) where user_id = p_user;
-  update public.profiles set district = a.district, address = a.address, reference = a.reference where id = p_user;
+  update public.profiles set district = a.district, address = concat_ws(', ', a.address, a.unit), reference = a.reference where id = p_user;
 end $$;
 
 -- Crear o editar una dirección (máximo 5 por usuario)
+drop function if exists public.save_address(uuid, text, text, text, text, boolean);
 create or replace function public.save_address(
-  p_id uuid, p_label text, p_district text, p_address text, p_reference text, p_default boolean
+  p_id uuid, p_label text, p_district text, p_address text, p_reference text, p_default boolean, p_unit text default null
 ) returns uuid language plpgsql security definer set search_path = public as $$
 declare v_id uuid; v_count int;
 begin
@@ -218,11 +223,13 @@ begin
   if p_id is null then
     select count(*) into v_count from public.addresses where user_id = auth.uid();
     if v_count >= 5 then raise exception 'Puedes guardar hasta 5 direcciones'; end if;
-    insert into public.addresses (user_id, label, district, address, reference, is_default)
-    values (auth.uid(), left(trim(p_label),30), p_district, left(trim(p_address),160), nullif(left(trim(coalesce(p_reference,'')),160),''), coalesce(p_default,false) or v_count = 0)
+    insert into public.addresses (user_id, label, district, address, unit, reference, is_default)
+    values (auth.uid(), left(trim(p_label),30), p_district, left(trim(p_address),160), nullif(left(trim(coalesce(p_unit,'')),30),''),
+            nullif(left(trim(coalesce(p_reference,'')),160),''), coalesce(p_default,false) or v_count = 0)
     returning id into v_id;
   else
     update public.addresses set label = left(trim(p_label),30), district = p_district, address = left(trim(p_address),160),
+      unit = nullif(left(trim(coalesce(p_unit,'')),30),''),
       reference = nullif(left(trim(coalesce(p_reference,'')),160),''), is_default = is_default or coalesce(p_default,false)
     where id = p_id and user_id = auth.uid() returning id into v_id;
     if v_id is null then raise exception 'Dirección no encontrada'; end if;
@@ -261,7 +268,7 @@ begin
   if a.id is null then raise exception 'Agrega una dirección de recojo en tu perfil'; end if;
   if p_address is not null and a.id <> p_address then raise exception 'Elige una de tus direcciones'; end if;
   insert into public.books (owner_id, title, author, cover_url, genre, condition, district, pickup_label, pickup_address, pickup_reference)
-  values (auth.uid(), trim(p_title), trim(p_author), nullif(p_cover_url,''), p_genre, p_condition, a.district, a.label, a.address, a.reference)
+  values (auth.uid(), trim(p_title), trim(p_author), nullif(p_cover_url,''), p_genre, p_condition, a.district, a.label, concat_ws(', ', a.address, a.unit), a.reference)
   returning id into v_id;
   return v_id;
 end $$;
@@ -296,7 +303,7 @@ begin
   insert into public.requests (book_id, donor_id, requester_id, book_title, book_cover, from_district, to_district, delivery_fee, platform_fee, total,
     pickup_label, pickup_address, pickup_reference, delivery_label, delivery_address, delivery_reference)
   values (b.id, b.owner_id, me.id, b.title, b.cover_url, b.district, a.district, v_tariff, v_fee, v_tariff + v_fee,
-    b.pickup_label, b.pickup_address, b.pickup_reference, a.label, a.address, a.reference)
+    b.pickup_label, b.pickup_address, b.pickup_reference, a.label, concat_ws(', ', a.address, a.unit), a.reference)
   returning id into v_id;
   update public.books set status = 'reservado' where id = b.id;
   update public.profiles set credits = credits - 1 where id = me.id;

@@ -35,9 +35,11 @@ export type MyRequest = {
   my_address_label: string | null; my_address: string | null; my_district: string | null;
 };
 export type Address = {
-  id: string; user_id: string; label: string; district: string; address: string; reference: string | null;
+  id: string; user_id: string; label: string; district: string; address: string; unit: string | null; reference: string | null;
   is_default: boolean; created_at: string;
 };
+/** "Av. Larco 123, Dpto 501" */
+export const fullAddress = (a: { address: string; unit?: string | null }) => (a.unit ? `${a.address}, ${a.unit}` : a.address);
 export const ADDRESS_LABELS = ["Casa", "Trabajo", "Departamento"];
 export type Request = {
   id: string; book_id: string; donor_id: string; requester_id: string; book_title: string; book_cover: string | null;
