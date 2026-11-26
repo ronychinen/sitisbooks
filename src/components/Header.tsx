@@ -14,8 +14,9 @@ export default async function Header() {
     <header className="top">
       <div className="wrap topbar">
         <Link href="/" className="logo"><i aria-hidden="true" />Sitisbooks</Link>
-        {profile && <span className="credits">Créditos <b>{profile.credits}</b></span>}
-        <NavLinks links={links} />
+        <NavLinks links={links}>
+          {profile && <span className="credits" title="Cada crédito te permite pedir 1 libro">Créditos <b>{profile.credits}</b></span>}
+        </NavLinks>
       </div>
     </header>
   );
