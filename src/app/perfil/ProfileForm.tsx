@@ -21,10 +21,12 @@ export default function ProfileForm({ email, profile, next, isNew }: { email: st
     e.preventDefault();
     if (!/^9\d{8}$/.test(f.phone)) { setError("El celular debe tener 9 dígitos y empezar con 9."); return; }
     setBusy(true); setError("");
-    const { error } = await supabase.rpc("save_profile", {
-      p_first_name: f.first_name, p_last_name: f.last_name, p_phone: f.phone,
-      p_district: f.district, p_address: f.address, p_reference: f.reference,
-    });
+    const { error } = isNew
+      ? await supabase.rpc("save_profile", {
+          p_first_name: f.first_name, p_last_name: f.last_name, p_phone: f.phone,
+          p_district: f.district, p_address: f.address, p_reference: f.reference,
+        })
+      : await supabase.rpc("update_contact", { p_first_name: f.first_name, p_last_name: f.last_name, p_phone: f.phone });
     setBusy(false);
     if (error) { setError("No pudimos guardar tus datos. Inténtalo de nuevo."); return; }
     if (isNew) { router.replace(next === "/" ? "/donar" : next); }
@@ -41,15 +43,18 @@ export default function ProfileForm({ email, profile, next, isNew }: { email: st
       </div>
       <div className="grid2">
         <label>Celular (WhatsApp)<input id="phone" required inputMode="numeric" maxLength={9} placeholder="9XXXXXXXX" autoComplete="tel-national" value={f.phone} onChange={(e) => { setF({ ...f, phone: e.target.value.replace(/\D/g, "") }); setSaved(false); }} /></label>
-        <label>Distrito
+        {isNew && <label>Distrito
           <select id="district" required value={f.district} onChange={set("district")}>
             <option value="">Elige tu distrito</option>
             {DISTRICTS.map((d) => <option key={d}>{d}</option>)}
           </select>
-        </label>
+        </label>}
       </div>
-      <label>Dirección (recojo y entrega)<input id="address" required maxLength={160} autoComplete="street-address" placeholder="Av./Calle, número, dpto." value={f.address} onChange={set("address")} /></label>
-      <label>Referencia (opcional)<input id="reference" maxLength={160} placeholder="Frente al parque, portón verde…" value={f.reference} onChange={set("reference")} /></label>
+      {isNew && <>
+        <label>Dirección (recojo y entrega)<input id="address" required maxLength={160} autoComplete="street-address" placeholder="Av./Calle, número, dpto." value={f.address} onChange={set("address")} /></label>
+        <label>Referencia (opcional)<input id="reference" maxLength={160} placeholder="Frente al parque, portón verde…" value={f.reference} onChange={set("reference")} /></label>
+        <p className="muted" style={{ fontSize: 13, margin: 0 }}>La guardamos como “Casa”. Luego puedes agregar más direcciones (trabajo, departamento…).</p>
+      </>}
       {error && <p className="error">{error}</p>}
       {saved && <p className="note">Datos guardados.</p>}
       <button className="btn" disabled={busy}>{busy ? "Guardando…" : isNew ? "Activar mi cuenta" : "Guardar cambios"}</button>

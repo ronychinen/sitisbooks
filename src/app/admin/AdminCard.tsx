@@ -11,13 +11,17 @@ const toLocal = (iso: string | null) => (iso ? new Date(new Date(iso).getTime() 
 const toISO = (local: string) => (local ? `${local}:00-05:00` : null);
 const wa = (phone: string | undefined, text: string) => (phone ? `https://wa.me/51${phone}?text=${encodeURIComponent(text)}` : null);
 
-function Party({ label, p, district }: { label: string; p: Profile | null; district: string }) {
+type Addr = { label: string | null; address: string | null; reference: string | null; district: string };
+
+function Party({ label, p, a }: { label: string; p: Profile | null; a: Addr }) {
+  // Dirección elegida en el intercambio; si es un intercambio antiguo, la del perfil
+  const address = a.address ?? p?.address ?? "—", reference = a.address ? a.reference : p?.reference;
   return (
     <div className="party">
       <span className="eyebrow">{label}</span>
       <span className="who">{p ? `${p.first_name} ${p.last_name}` : "Usuario sin perfil"}</span>
-      <span>{p?.address ?? "—"} · {p?.district ?? district}</span>
-      {p?.reference && <span className="muted">Ref.: {p.reference}</span>}
+      <span>{a.label && <b>{a.label}: </b>}{address} · {a.district}</span>
+      {reference && <span className="muted">Ref.: {reference}</span>}
       <span className="ph">{p?.phone ?? "—"}</span>
       <span className="muted" style={{ fontSize: 13 }}>{p?.email}</span>
     </div>
@@ -51,8 +55,8 @@ export default function AdminCard({ r, donor, requester, proofUrl }: { r: Reques
       status === r.status ? "Cambios guardados" : status === "entregado" ? "Entregado. El donante recibió 1 crédito." : `Estado: ${STATUS_LABEL[status]}`);
 
   const dName = donor?.first_name ?? "", rName = requester?.first_name ?? "";
-  const waDonor = wa(donor?.phone, `Hola ${dName}, te escribimos de Sitisbooks. Alguien pidió tu libro "${r.book_title}". ¿Podemos recogerlo el ${pickup ? fmtDT(toISO(pickup)) : "[fecha y hora]"} en ${donor?.address ?? "tu dirección"}?`);
-  const waReq = wa(requester?.phone, `Hola ${rName}, te escribimos de Sitisbooks. Tu libro "${r.book_title}" llegará el ${delivery ? fmtDT(toISO(delivery)) : "[fecha y hora]"} a ${requester?.address ?? "tu dirección"}.`);
+  const waDonor = wa(donor?.phone, `Hola ${dName}, te escribimos de Sitisbooks. Alguien pidió tu libro "${r.book_title}". ¿Podemos recogerlo el ${pickup ? fmtDT(toISO(pickup)) : "[fecha y hora]"} en ${r.pickup_address ?? donor?.address ?? "tu dirección"}?`);
+  const waReq = wa(requester?.phone, `Hola ${rName}, te escribimos de Sitisbooks. Tu libro "${r.book_title}" llegará el ${delivery ? fmtDT(toISO(delivery)) : "[fecha y hora]"} a ${r.delivery_address ?? requester?.address ?? "tu dirección"}.`);
 
   return (
     <article className={`adm st-${r.status}`}>
@@ -64,8 +68,8 @@ export default function AdminCard({ r, donor, requester, proofUrl }: { r: Reques
         <div className="row"><span className={`chip s-${r.status}`}>{STATUS_LABEL[r.status]}</span><span className="chip" style={{ color: "var(--ink)" }}>{soles(r.total)}</span></div>
       </div>
 
-      <Party label="Donante · recojo" p={donor} district={r.from_district} />
-      <Party label="Solicitante · entrega" p={requester} district={r.to_district} />
+      <Party label="Donante · recojo" p={donor} a={{ label: r.pickup_label, address: r.pickup_address, reference: r.pickup_reference, district: r.from_district }} />
+      <Party label="Solicitante · entrega" p={requester} a={{ label: r.delivery_label, address: r.delivery_address, reference: r.delivery_reference, district: r.to_district }} />
 
       {r.status === "pago_en_revision" && (
         <div className="full panel stack" style={{ padding: 14 }}>

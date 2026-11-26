@@ -21,6 +21,23 @@ create table if not exists public.profiles (
   created_at  timestamptz not null default now()
 );
 
+-- ---------- Direcciones (v4: varias por usuario: casa, trabajo, etc.) ----------
+create table if not exists public.addresses (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references public.profiles(id) on delete cascade,
+  label       text not null check (char_length(label) between 1 and 30),
+  district    text not null,
+  address     text not null check (char_length(address) between 3 and 160),
+  reference   text,
+  is_default  boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+create index if not exists addresses_user_idx on public.addresses(user_id);
+-- Migración: cada perfil existente obtiene su dirección actual como "Casa" (predeterminada)
+insert into public.addresses (user_id, label, district, address, reference, is_default)
+  select p.id, 'Casa', p.district, p.address, p.reference, true from public.profiles p
+  where not exists (select 1 from public.addresses a where a.user_id = p.id);
+
 -- ---------- Configuración (fila única) ----------
 create table if not exists public.settings (
   id           int primary key default 1 check (id = 1),
@@ -93,6 +110,16 @@ create table if not exists public.requests (
   updated_at      timestamptz not null default now()
 );
 alter table public.requests add column if not exists delivered_at timestamptz;
+-- v4: dirección elegida (copia fija al momento de publicar / pedir)
+alter table public.books    add column if not exists pickup_label text;
+alter table public.books    add column if not exists pickup_address text;
+alter table public.books    add column if not exists pickup_reference text;
+alter table public.requests add column if not exists pickup_label text;
+alter table public.requests add column if not exists pickup_address text;
+alter table public.requests add column if not exists pickup_reference text;
+alter table public.requests add column if not exists delivery_label text;
+alter table public.requests add column if not exists delivery_address text;
+alter table public.requests add column if not exists delivery_reference text;
 create index if not exists requests_status_idx on public.requests(status, created_at desc);
 
 -- ---------- Helpers ----------
@@ -112,6 +139,10 @@ alter table public.profiles enable row level security;
 alter table public.settings enable row level security;
 alter table public.books    enable row level security;
 alter table public.requests enable row level security;
+alter table public.addresses enable row level security;
+drop policy if exists "direcciones propias o admin" on public.addresses;
+create policy "direcciones propias o admin" on public.addresses
+  for select using (user_id = auth.uid() or public.is_admin());
 
 drop policy if exists "perfil propio o admin" on public.profiles;
 create policy "perfil propio o admin" on public.profiles
@@ -146,22 +177,91 @@ begin
   on conflict (id) do update set
     first_name = excluded.first_name, last_name = excluded.last_name, phone = excluded.phone,
     district = excluded.district, address = excluded.address, reference = excluded.reference;
+  if not exists (select 1 from public.addresses where user_id = auth.uid()) then
+    insert into public.addresses (user_id, label, district, address, reference, is_default)
+    values (auth.uid(), 'Casa', p_district, trim(p_address), nullif(trim(p_reference),''), true);
+  end if;
+end $$;
+
+-- Datos de contacto (sin dirección: las direcciones se gestionan aparte)
+create or replace function public.update_contact(p_first_name text, p_last_name text, p_phone text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'Debes iniciar sesión'; end if;
+  update public.profiles set first_name = trim(p_first_name), last_name = trim(p_last_name), phone = p_phone
+  where id = auth.uid();
+  if not found then raise exception 'Completa tu perfil primero'; end if;
+end $$;
+
+-- Copia la dirección predeterminada al perfil (la usan el admin y valores por defecto)
+create or replace function public.sync_default_address(p_user uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare a public.addresses;
+begin
+  select * into a from public.addresses where user_id = p_user order by is_default desc, created_at limit 1;
+  if a.id is null then return; end if;
+  update public.addresses set is_default = (id = a.id) where user_id = p_user;
+  update public.profiles set district = a.district, address = a.address, reference = a.reference where id = p_user;
+end $$;
+
+-- Crear o editar una dirección (máximo 5 por usuario)
+create or replace function public.save_address(
+  p_id uuid, p_label text, p_district text, p_address text, p_reference text, p_default boolean
+) returns uuid language plpgsql security definer set search_path = public as $$
+declare v_id uuid; v_count int;
+begin
+  if auth.uid() is null then raise exception 'Debes iniciar sesión'; end if;
+  if not exists (select 1 from public.profiles where id = auth.uid()) then raise exception 'Completa tu perfil primero'; end if;
+  if char_length(trim(coalesce(p_label,''))) = 0 then raise exception 'Ponle un nombre a la dirección (ej. Casa)'; end if;
+  if char_length(trim(coalesce(p_address,''))) < 3 then raise exception 'Escribe la dirección completa'; end if;
+  if coalesce(p_district,'') = '' then raise exception 'Elige el distrito'; end if;
+  if p_id is null then
+    select count(*) into v_count from public.addresses where user_id = auth.uid();
+    if v_count >= 5 then raise exception 'Puedes guardar hasta 5 direcciones'; end if;
+    insert into public.addresses (user_id, label, district, address, reference, is_default)
+    values (auth.uid(), left(trim(p_label),30), p_district, left(trim(p_address),160), nullif(left(trim(coalesce(p_reference,'')),160),''), coalesce(p_default,false) or v_count = 0)
+    returning id into v_id;
+  else
+    update public.addresses set label = left(trim(p_label),30), district = p_district, address = left(trim(p_address),160),
+      reference = nullif(left(trim(coalesce(p_reference,'')),160),''), is_default = is_default or coalesce(p_default,false)
+    where id = p_id and user_id = auth.uid() returning id into v_id;
+    if v_id is null then raise exception 'Dirección no encontrada'; end if;
+  end if;
+  if coalesce(p_default,false) then
+    update public.addresses set is_default = (id = v_id) where user_id = auth.uid();
+  end if;
+  perform public.sync_default_address(auth.uid());
+  return v_id;
+end $$;
+
+create or replace function public.delete_address(p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if (select count(*) from public.addresses where user_id = auth.uid()) <= 1 then
+    raise exception 'Debes tener al menos una dirección';
+  end if;
+  delete from public.addresses where id = p_id and user_id = auth.uid();
+  if not found then raise exception 'Dirección no encontrada'; end if;
+  perform public.sync_default_address(auth.uid());
 end $$;
 
 -- ---------- Libros ----------
+drop function if exists public.publish_book(text, text, text, text, text);
 create or replace function public.publish_book(
-  p_title text, p_author text, p_cover_url text, p_genre text, p_condition text
+  p_title text, p_author text, p_cover_url text, p_genre text, p_condition text, p_address uuid
 ) returns uuid language plpgsql security definer set search_path = public as $$
-declare v_district text; v_id uuid; v_err text;
+declare a public.addresses; v_id uuid; v_err text;
 begin
   v_err := public.contact_violation(p_title);
   if v_err is not null then raise exception 'El título %', v_err; end if;
   v_err := public.contact_violation(p_author);
   if v_err is not null then raise exception 'El autor %', v_err; end if;
-  select district into v_district from public.profiles where id = auth.uid();
-  if v_district is null then raise exception 'Completa tu perfil antes de publicar'; end if;
-  insert into public.books (owner_id, title, author, cover_url, genre, condition, district)
-  values (auth.uid(), trim(p_title), trim(p_author), nullif(p_cover_url,''), p_genre, p_condition, v_district)
+  select * into a from public.addresses where user_id = auth.uid()
+    order by (id = p_address) desc, is_default desc, created_at limit 1;
+  if a.id is null then raise exception 'Agrega una dirección de recojo en tu perfil'; end if;
+  if p_address is not null and a.id <> p_address then raise exception 'Elige una de tus direcciones'; end if;
+  insert into public.books (owner_id, title, author, cover_url, genre, condition, district, pickup_label, pickup_address, pickup_reference)
+  values (auth.uid(), trim(p_title), trim(p_author), nullif(p_cover_url,''), p_genre, p_condition, a.district, a.label, a.address, a.reference)
   returning id into v_id;
   return v_id;
 end $$;
@@ -175,9 +275,10 @@ begin
 end $$;
 
 -- ---------- Pedir un libro (consume 1 crédito, reserva el libro) ----------
-create or replace function public.request_book(p_book uuid) returns uuid
+drop function if exists public.request_book(uuid);
+create or replace function public.request_book(p_book uuid, p_address uuid) returns uuid
 language plpgsql security definer set search_path = public as $$
-declare b public.books; me public.profiles; s public.settings; v_fee numeric; v_tariff numeric; v_id uuid;
+declare b public.books; me public.profiles; s public.settings; a public.addresses; v_fee numeric; v_tariff numeric; v_id uuid;
 begin
   select * into me from public.profiles where id = auth.uid() for update;
   if me.id is null then raise exception 'Completa tu perfil antes de pedir libros'; end if;
@@ -185,11 +286,17 @@ begin
   select * into b from public.books where id = p_book for update;
   if b.id is null or b.status <> 'disponible' then raise exception 'Este libro ya no está disponible'; end if;
   if b.owner_id = me.id then raise exception 'No puedes pedir tu propio libro'; end if;
+  select * into a from public.addresses where user_id = me.id
+    order by (id = p_address) desc, is_default desc, created_at limit 1;
+  if a.id is null then raise exception 'Agrega una dirección de entrega en tu perfil'; end if;
+  if p_address is not null and a.id <> p_address then raise exception 'Elige una de tus direcciones'; end if;
   select * into s from public.settings where id = 1;
   v_fee := s.fee;
-  v_tariff := coalesce((s.tariffs ->> me.district)::numeric, s.default_tariff);
-  insert into public.requests (book_id, donor_id, requester_id, book_title, book_cover, from_district, to_district, delivery_fee, platform_fee, total)
-  values (b.id, b.owner_id, me.id, b.title, b.cover_url, b.district, me.district, v_tariff, v_fee, v_tariff + v_fee)
+  v_tariff := coalesce((s.tariffs ->> a.district)::numeric, s.default_tariff);
+  insert into public.requests (book_id, donor_id, requester_id, book_title, book_cover, from_district, to_district, delivery_fee, platform_fee, total,
+    pickup_label, pickup_address, pickup_reference, delivery_label, delivery_address, delivery_reference)
+  values (b.id, b.owner_id, me.id, b.title, b.cover_url, b.district, a.district, v_tariff, v_fee, v_tariff + v_fee,
+    b.pickup_label, b.pickup_address, b.pickup_reference, a.label, a.address, a.reference)
   returning id into v_id;
   update public.books set status = 'reservado' where id = b.id;
   update public.profiles set credits = credits - 1 where id = me.id;
@@ -280,7 +387,7 @@ revoke execute on all functions in schema public from public, anon;
 grant execute on function public.is_admin to anon, authenticated;
 grant execute on function public.save_profile, public.publish_book, public.withdraw_book, public.request_book,
   public.submit_payment, public.cancel_my_request, public.admin_review_payment, public.admin_update_request,
-  public.admin_set_credits to authenticated;
+  public.admin_set_credits, public.update_contact, public.save_address, public.delete_address to authenticated;
 
 -- ---------- Permisos de tablas (proyectos Supabase desde mayo 2026 no exponen tablas por defecto) ----------
 -- RLS sigue limitando qué filas ve cada usuario.
@@ -288,6 +395,7 @@ grant select on public.profiles to authenticated;
 grant select on public.settings to anon, authenticated;
 grant update on public.settings to authenticated;
 grant select on public.requests to authenticated;
+grant select on public.addresses to authenticated;
 
 -- ---------- Privacidad: vistas seguras para usuarios ----------
 -- Los usuarios NUNCA leen las tablas books/requests directamente: solo estas vistas,
@@ -318,7 +426,11 @@ create or replace view public.my_requests as
          case when r.requester_id = auth.uid() then r.total end as total,
          case when r.requester_id = auth.uid() then r.payment_note end as payment_note,
          case when r.requester_id = auth.uid() then r.delivery_at end as delivery_at,
-         case when r.donor_id = auth.uid() then r.pickup_at end as pickup_at
+         case when r.donor_id = auth.uid() then r.pickup_at end as pickup_at,
+         -- v4: cada uno ve solo SU dirección (entrega para quien recibe, recojo para quien dona)
+         case when r.requester_id = auth.uid() then r.delivery_label else r.pickup_label end as my_address_label,
+         case when r.requester_id = auth.uid() then r.delivery_address else r.pickup_address end as my_address,
+         case when r.requester_id = auth.uid() then r.to_district else r.from_district end as my_district
   from public.requests r
   where r.requester_id = auth.uid() or r.donor_id = auth.uid();
 

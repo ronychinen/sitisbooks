@@ -32,13 +32,21 @@ export type MyRequest = {
   id: string; role: "recibido" | "donado"; book_title: string; book_cover: string | null; status: string;
   created_at: string; delivered_at: string | null; delivery_fee: number | null; platform_fee: number | null;
   total: number | null; payment_note: string | null; delivery_at: string | null; pickup_at: string | null;
+  my_address_label: string | null; my_address: string | null; my_district: string | null;
 };
+export type Address = {
+  id: string; user_id: string; label: string; district: string; address: string; reference: string | null;
+  is_default: boolean; created_at: string;
+};
+export const ADDRESS_LABELS = ["Casa", "Trabajo", "Departamento"];
 export type Request = {
   id: string; book_id: string; donor_id: string; requester_id: string; book_title: string; book_cover: string | null;
   from_district: string; to_district: string; delivery_fee: number; platform_fee: number; total: number;
   status: string; payment_method: string | null; operation_code: string | null; proof_path: string | null;
   payment_note: string | null; pickup_at: string | null; delivery_at: string | null; admin_note: string | null;
   credit_granted: boolean; created_at: string; updated_at: string; delivered_at: string | null;
+  pickup_label: string | null; pickup_address: string | null; pickup_reference: string | null;
+  delivery_label: string | null; delivery_address: string | null; delivery_reference: string | null;
 };
 export type Settings = {
   id: number; fee: number; tariffs: Record<string, number>; default_tariff: number;

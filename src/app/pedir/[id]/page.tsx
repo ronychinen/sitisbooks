@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { requireProfile } from "@/lib/supabase/server";
+import { getAddresses, requireProfile } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
 import GenreTag from "@/components/GenreTag";
-import { soles, tariffFor, type CatalogBook, type Settings } from "@/lib/constants";
-import RequestButton from "./RequestButton";
+import { type CatalogBook, type Settings } from "@/lib/constants";
+import RequestPanel from "./RequestPanel";
 
 export const metadata = { title: "Pedir libro", robots: { index: false, follow: false } };
 
@@ -12,15 +12,15 @@ export const dynamic = "force-dynamic";
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { supabase, profile } = await requireProfile(`/pedir/${id}`);
-  const [{ data: book }, { data: settings }] = await Promise.all([
+  const [{ data: book }, { data: settings }, addresses] = await Promise.all([
     supabase.from("catalog").select("*").eq("id", id).maybeSingle(),
     supabase.from("settings").select("*").eq("id", 1).maybeSingle(),
+    getAddresses(supabase),
   ]);
   if (!book) {
     return <div className="empty"><h3>Este libro ya no está disponible</h3><p>Otra persona lo pidió o el donante lo retiró.</p><Link className="btn" href="/">Ver otros libros</Link></div>;
   }
   const b = book as CatalogBook, s = settings as Settings | null;
-  const delivery = tariffFor(s, profile.district), fee = Number(s?.fee ?? 5);
   const own = b.is_mine, unavailable = false, noCredits = profile.credits < 1;
 
   return (
@@ -32,18 +32,12 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <h1 style={{ fontSize: 32 }}>{b.title}</h1>
           <p className="muted" style={{ marginTop: 4 }}>{b.author} · {b.condition}</p>
         </div>
-        <div className="panel cost">
-          <span>Crédito</span><span className="n">1 de {profile.credits}</span>
-          <span>Delivery a {profile.district}</span><span className="n">{soles(delivery)}</span>
-          <span>Comisión Sitisbooks</span><span className="n">{soles(fee)}</span>
-          <span className="tot">Total a pagar</span><span className="n tot">{soles(delivery + fee)}</span>
-        </div>
+        <RequestPanel bookId={b.id} credits={profile.credits} settings={s} addresses={addresses} canRequest={!own && !unavailable && !noCredits} />
         <p className="note">Pagas por Yape o transferencia en el siguiente paso. Reservamos el libro para ti mientras subes tu comprobante. Sitisbooks coordina el recojo y la entrega; no compartimos tus datos con el donante.</p>
         {own ? <p className="error">Este libro es tuyo.</p>
           : unavailable ? <p className="error">Este libro ya no está disponible.</p>
           : noCredits ? <div className="stack"><p className="error">No tienes créditos. Dona un libro para ganar uno.</p><Link className="btn" href="/donar">Donar un libro</Link></div>
-          : <RequestButton bookId={b.id} total={delivery + fee} />}
-        <p className="muted" style={{ fontSize: 13 }}>Entregamos en: {profile.address}, {profile.district}. <Link href="/perfil">Cambiar dirección</Link></p>
+          : null}
       </section>
     </div>
   );

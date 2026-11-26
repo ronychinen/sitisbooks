@@ -4,17 +4,20 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { CONDITIONS, GENRES, contactViolation } from "@/lib/constants";
 import BookCover from "@/components/BookCover";
+import AddressSelect from "@/components/AddressSelect";
+import type { Address } from "@/lib/constants";
 
 type Candidate = { url: string; source: string; title: string; author: string; year?: string };
 type CoverChoice = { kind: "none" } | { kind: "url"; url: string } | { kind: "upload"; url: string };
 
-export default function DonateForm() {
+export default function DonateForm({ addresses }: { addresses: Address[] }) {
   const supabase = createClient();
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [genre, setGenre] = useState("");
   const [condition, setCondition] = useState("");
+  const [addressId, setAddressId] = useState(addresses[0]?.id ?? "");
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
@@ -123,7 +126,7 @@ export default function DonateForm() {
     setBusy(true); setError("");
     const { error } = await supabase.rpc("publish_book", {
       p_title: title, p_author: author, p_cover_url: cover.kind === "none" ? "" : cover.url,
-      p_genre: genre, p_condition: condition,
+      p_genre: genre, p_condition: condition, p_address: addressId || null,
     });
     setBusy(false);
     if (error) { setError(error.message || "No pudimos publicar el libro. Inténtalo de nuevo."); return; }
@@ -215,6 +218,7 @@ export default function DonateForm() {
           </select>
         </label>
       </div>
+      <AddressSelect label="Dirección de recojo" addresses={addresses} value={addressId} onChange={setAddressId} next="/donar" />
       {error && <p className="error">{error}</p>}
       <p className="muted" style={{ fontSize: 13 }}>Por tu seguridad, no incluyas teléfonos, correos ni redes sociales: Sitisbooks coordina todo por ti.</p>
       <button className="btn" disabled={busy || !cover || !!titleErr || !!authorErr}>{busy ? "Publicando…" : "Publicar libro"}</button>

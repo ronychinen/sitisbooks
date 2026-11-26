@@ -38,6 +38,12 @@ export type Profile = {
   donated: number; received: number; is_admin: boolean; created_at: string;
 };
 
+/** Direcciones del usuario actual, la predeterminada primero. */
+export async function getAddresses(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const { data } = await supabase.from("addresses").select("*").order("is_default", { ascending: false }).order("created_at");
+  return (data ?? []) as import("@/lib/constants").Address[];
+}
+
 /** Exige sesión y perfil completo; si falta algo, redirige. */
 export async function requireProfile(next: string) {
   const { redirect } = await import("next/navigation");

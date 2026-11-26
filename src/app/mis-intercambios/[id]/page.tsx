@@ -33,6 +33,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <p className="eyebrow">{isReq ? "Libro que pediste" : "Libro que donas"}</p>
           <h2>{r.book_title}</h2>
           <span className={`chip s-${r.status}`} style={{ alignSelf: "flex-start" }}>{STATUS_LABEL[r.status]}</span>
+          {r.my_address && <span className="muted" style={{ fontSize: 14 }}>{isReq ? "Entrega en" : "Recojo en"} {r.my_address_label}: {r.my_address}, {r.my_district}</span>}
         </div>
       </div>
 

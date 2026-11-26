@@ -1,4 +1,4 @@
-import { requireProfile } from "@/lib/supabase/server";
+import { getAddresses, requireProfile } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
 import DonateForm from "./DonateForm";
 import WithdrawButton from "./WithdrawButton";
@@ -10,17 +10,20 @@ export const dynamic = "force-dynamic";
 const LABEL: Record<string, string> = { disponible: "Disponible", reservado: "Reservado", entregado: "Donado", retirado: "Retirado" };
 
 export default async function Page() {
-  const { supabase, profile } = await requireProfile("/donar");
-  const { data } = await supabase.from("my_books").select("*").order("created_at", { ascending: false });
+  const { supabase } = await requireProfile("/donar");
+  const [{ data }, addresses] = await Promise.all([
+    supabase.from("my_books").select("*").order("created_at", { ascending: false }),
+    getAddresses(supabase),
+  ]);
   const mine = (data ?? []) as MyBook[];
   return (
     <div className="split">
       <section className="panel stack">
         <div>
           <h2>Publica un libro para donar</h2>
-          <p className="muted" style={{ marginTop: 6 }}>Lo recogemos en {profile.district}. Ganas 1 crédito cuando llega a su nuevo lector. Sitisbooks coordina contigo el recojo: nadie más ve tus datos.</p>
+          <p className="muted" style={{ marginTop: 6 }}>Lo recogemos en la dirección que elijas. Ganas 1 crédito cuando llega a su nuevo lector. Sitisbooks coordina contigo el recojo: nadie más ve tus datos.</p>
         </div>
-        <DonateForm />
+        <DonateForm addresses={addresses} />
       </section>
       <section className="stack">
         <h3>Tus libros publicados</h3>
