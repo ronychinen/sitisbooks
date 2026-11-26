@@ -7,14 +7,10 @@ export const metadata = {
   alternates: { canonical: "/terminos" },
 };
 
-// Datos del titular: completar antes del lanzamiento público
-const OWNER = "[RAZÓN SOCIAL O NOMBRE DEL TITULAR]";
-const OWNER_ID = "[RUC o DNI]";
-const OWNER_ADDRESS = "[DOMICILIO]";
-const CONTACT = "[CORREO DE CONTACTO]";
+const CONTACT = <a href="mailto:sitisbooks@gmail.com">sitisbooks@gmail.com</a>;
 
 const SECTIONS = [
-  ["titular", "Quiénes somos"], ["servicio", "Qué es Sitisbooks"], ["cuenta", "Registro y cuenta"], ["creditos", "Créditos"],
+  ["servicio", "Qué es Sitisbooks"], ["cuenta", "Registro y cuenta"], ["creditos", "Créditos"],
   ["donar", "Publicar y donar libros"], ["entrega", "Compromiso de entrega"], ["pedidos", "Pedidos, pagos y reembolsos"],
   ["estado", "Estado de los libros y reclamos"], ["conducta", "Conductas prohibidas"], ["suspension", "Suspensión de cuentas"],
   ["responsabilidad", "Limitación de responsabilidad"], ["propiedad", "Propiedad intelectual"], ["privacidad", "Política de privacidad"],
@@ -31,10 +27,7 @@ export default function Page() {
       </div>
       <nav className="toc" aria-label="Contenido"><ol>{SECTIONS.map(([id, t]) => <li key={id}><a href={`#${id}`}>{t}</a></li>)}</ol></nav>
 
-      <section><h2 id="titular">1. Quiénes somos</h2>
-        <p>Sitisbooks es operado por {OWNER}, identificado con {OWNER_ID}, con domicilio en {OWNER_ADDRESS}, Lima, Perú (en adelante, “Sitisbooks”). Puedes escribirnos a {CONTACT}.</p></section>
-
-      <section><h2 id="servicio">2. Qué es Sitisbooks</h2>
+      <section><h2 id="servicio">1. Qué es Sitisbooks</h2>
         <ol>
           <li>Sitisbooks es una plataforma que conecta a personas que donan libros usados con personas que desean recibirlos, dentro de Lima Metropolitana y el Callao.</li>
           <li>Sitisbooks no vende libros ni es propietario de los libros publicados. Los libros pertenecen a quienes los publican hasta su entrega.</li>
@@ -42,7 +35,7 @@ export default function Page() {
           <li>Sitisbooks coordina el recojo y la entrega directamente con cada usuario, por WhatsApp u otros medios de contacto que registres.</li>
         </ol></section>
 
-      <section><h2 id="cuenta">3. Registro y cuenta</h2>
+      <section><h2 id="cuenta">2. Registro y cuenta</h2>
         <ol>
           <li>Para usar la plataforma debes ser mayor de 18 años y registrarte con un correo electrónico válido.</li>
           <li>Te comprometes a registrar datos verdaderos, completos y actualizados (nombre, celular y direcciones). Sitisbooks puede suspender cuentas con datos falsos.</li>
@@ -51,7 +44,7 @@ export default function Page() {
           <li>Puedes solicitar la eliminación de tu cuenta escribiéndonos. Los intercambios en curso deberán completarse o cancelarse antes.</li>
         </ol></section>
 
-      <section><h2 id="creditos">4. Créditos</h2>
+      <section><h2 id="creditos">3. Créditos</h2>
         <ol>
           <li>Un crédito permite pedir un libro. Se obtiene (a) al registrarte, como crédito de bienvenida, (b) cuando un libro que donaste es entregado a su nuevo lector, o (c) comprándolo, cuando esta opción esté disponible.</li>
           <li>Los créditos no son dinero ni medio de pago, no generan intereses y no pueden canjearse por efectivo ni transferirse a otras cuentas.</li>
@@ -61,7 +54,7 @@ export default function Page() {
           <li>Sitisbooks puede corregir créditos acreditados por error.</li>
         </ol></section>
 
-      <section><h2 id="donar">5. Publicar y donar libros</h2>
+      <section><h2 id="donar">4. Publicar y donar libros</h2>
         <p>Al publicar un libro declaras y garantizas que:</p>
         <ol>
           <li>Eres el propietario legítimo del libro y tienes derecho a donarlo. No es robado, prestado, ni pertenece a una biblioteca, institución o tercero.</li>
@@ -72,7 +65,7 @@ export default function Page() {
         </ol>
         <p>Al entregar el libro, transfieres su propiedad de forma gratuita y definitiva a quien lo recibe. Sitisbooks puede retirar del catálogo cualquier publicación que incumpla estas reglas.</p></section>
 
-      <section><h2 id="entrega">6. Compromiso de entrega</h2>
+      <section><h2 id="entrega">5. Compromiso de entrega</h2>
         <ol>
           <li>Mientras tu libro esté publicado, debe estar disponible para entregarse. Si ya no lo tienes, retíralo del catálogo desde “Donar un libro”.</li>
           <li>Cuando alguien pide tu libro, te comprometes a entregarlo en la dirección de recojo que elegiste y en la fecha y hora coordinadas con Sitisbooks.</li>
@@ -80,7 +73,7 @@ export default function Page() {
           <li>El incumplimiento del compromiso de entrega es causa de suspensión definitiva de la cuenta y de pérdida de sus créditos. Además, Sitisbooks podrá cobrar el costo del recojo fallido cuando la falta sea atribuible al donante.</li>
         </ol></section>
 
-      <section><h2 id="pedidos">7. Pedidos, pagos y reembolsos</h2>
+      <section><h2 id="pedidos">6. Pedidos, pagos y reembolsos</h2>
         <ol>
           <li>Al pedir un libro usas 1 crédito y el ejemplar queda reservado. Debes pagar el delivery y la comisión por Yape o transferencia y subir el comprobante.</li>
           <li>Sitisbooks valida cada comprobante. Si el pago no se puede verificar, te pediremos corregirlo; un pedido sin pago válido puede cancelarse y el libro vuelve al catálogo.</li>
@@ -90,14 +83,14 @@ export default function Page() {
           <li>Los montos pagados no incluyen el valor del libro, que es una donación.</li>
         </ol></section>
 
-      <section><h2 id="estado">8. Estado de los libros y reclamos</h2>
+      <section><h2 id="estado">7. Estado de los libros y reclamos</h2>
         <ol>
           <li>El estado de cada libro (Nuevo, Como nuevo, Buen estado, Usado) lo declara su donante. Sitisbooks no inspecciona cada ejemplar en detalle.</li>
           <li>Si recibes un libro distinto al pedido, incompleto o en un estado claramente peor al declarado, avísanos dentro de las 48 horas siguientes a la entrega, con fotos. Evaluaremos el caso y, si corresponde, te devolveremos el crédito y aplicaremos medidas al donante.</li>
           <li>Los libros usados pueden tener señales normales de uso (subrayados leves, desgaste en la tapa, nombres escritos) que no se consideran defectos si coinciden con el estado declarado.</li>
         </ol></section>
 
-      <section><h2 id="conducta">9. Conductas prohibidas</h2>
+      <section><h2 id="conducta">8. Conductas prohibidas</h2>
         <ul>
           <li>Subir comprobantes de pago falsos, alterados o de operaciones ajenas.</li>
           <li>Crear varias cuentas, usar identidades ajenas o registrar datos falsos.</li>
@@ -109,7 +102,7 @@ export default function Page() {
           <li>Cualquier uso de la plataforma contrario a la ley, la moral o el orden público.</li>
         </ul></section>
 
-      <section><h2 id="suspension">10. Suspensión de cuentas</h2>
+      <section><h2 id="suspension">9. Suspensión de cuentas</h2>
         <ol>
           <li>Sitisbooks puede suspender temporal o definitivamente una cuenta que incumpla estos términos, en especial el compromiso de entrega y las conductas prohibidas.</li>
           <li>Una cuenta suspendida no puede publicar, pedir libros ni comprar créditos. Sus libros publicados se retiran del catálogo y sus créditos disponibles se pierden.</li>
@@ -117,7 +110,7 @@ export default function Page() {
           <li>Si crees que tu cuenta fue suspendida por error, escríbenos a {CONTACT}.</li>
         </ol></section>
 
-      <section><h2 id="responsabilidad">11. Limitación de responsabilidad</h2>
+      <section><h2 id="responsabilidad">10. Limitación de responsabilidad</h2>
         <ol>
           <li>Sitisbooks es un intermediario que facilita el intercambio. No es responsable por el uso indebido que los usuarios hagan de la plataforma, por la veracidad de lo que publican ni por el contenido de los libros.</li>
           <li>Cada usuario responde por los daños que cause por incumplir estos términos o la ley, incluidos los reclamos de terceros por libros de procedencia ilícita o copias no autorizadas.</li>
@@ -125,13 +118,13 @@ export default function Page() {
           <li>En los casos en que Sitisbooks deba responder, su responsabilidad se limita al monto pagado por el intercambio afectado, salvo dolo o culpa inexcusable, y sin perjuicio de los derechos que la ley reconoce a los consumidores.</li>
         </ol></section>
 
-      <section><h2 id="propiedad">12. Propiedad intelectual</h2>
+      <section><h2 id="propiedad">11. Propiedad intelectual</h2>
         <p>La marca, el logo, el diseño y el software de Sitisbooks le pertenecen. Las portadas de libros que se muestran pertenecen a sus respectivos titulares y se usan solo para identificar cada ejemplar. Si eres titular de derechos y consideras que algún contenido te afecta, escríbenos a {CONTACT}.</p></section>
 
-      <section><h2 id="privacidad">13. Política de privacidad</h2>
+      <section><h2 id="privacidad">12. Política de privacidad</h2>
         <p>Tratamos tus datos personales conforme a la Ley N.º 29733, Ley de Protección de Datos Personales, y su Reglamento aprobado por Decreto Supremo N.º 016-2024-JUS.</p>
         <ol>
-          <li><b>Responsable:</b> {OWNER}, con domicilio en {OWNER_ADDRESS}. Banco de datos “Usuarios de Sitisbooks”, inscrito en el Registro Nacional de Protección de Datos Personales con código [N.º DE REGISTRO].</li>
+          <li><b>Responsable:</b> Sitisbooks, contacto {CONTACT}. Banco de datos “Usuarios de Sitisbooks”, inscrito en el Registro Nacional de Protección de Datos Personales con código [N.º DE REGISTRO].</li>
           <li><b>Datos que recogemos:</b> correo, nombres y apellidos, celular, direcciones de recojo y entrega (y su ubicación en el mapa, si la marcas), comprobantes de pago, libros publicados e historial de intercambios.</li>
           <li><b>Para qué los usamos:</b> crear y gestionar tu cuenta; coordinar recojos y entregas; calcular el delivery; validar pagos; prevenir fraudes y hacer cumplir estos términos; y atender tus consultas y reclamos.</li>
           <li><b>Quién los ve:</b> solo el equipo de Sitisbooks y, cuando sea necesario para el recojo o la entrega, el repartidor asignado. Otros usuarios nunca ven tus datos. No vendemos tus datos.</li>
@@ -141,13 +134,13 @@ export default function Page() {
           <li><b>Seguridad:</b> aplicamos medidas técnicas y organizativas para proteger tus datos, como el acceso restringido por usuario y el cifrado en tránsito.</li>
         </ol></section>
 
-      <section><h2 id="reclamos">14. Atención de reclamos</h2>
+      <section><h2 id="reclamos">13. Atención de reclamos</h2>
         <p>Puedes enviarnos consultas o reclamos a {CONTACT}. Conforme al Código de Protección y Defensa del Consumidor, Sitisbooks pone a tu disposición un Libro de Reclamaciones virtual: [ENLACE AL LIBRO DE RECLAMACIONES].</p></section>
 
-      <section><h2 id="cambios">15. Cambios a estos términos</h2>
+      <section><h2 id="cambios">14. Cambios a estos términos</h2>
         <p>Podemos actualizar estos términos. Cuando el cambio sea relevante, te pediremos aceptarlos de nuevo al ingresar. La fecha de la última actualización figura al inicio.</p></section>
 
-      <section><h2 id="ley">16. Ley aplicable</h2>
+      <section><h2 id="ley">15. Ley aplicable</h2>
         <p>Estos términos se rigen por las leyes de la República del Perú. Cualquier controversia se someterá a los jueces y tribunales de Lima, sin perjuicio de los derechos que la ley reconoce a los consumidores y de su derecho a acudir al Indecopi.</p></section>
 
       <p><Link href="/">← Volver al catálogo</Link></p>
