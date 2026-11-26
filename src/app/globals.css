@@ -58,7 +58,9 @@ label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600}
 .cover .ct{font-family:var(--f-display),Georgia,serif;font-size:18px;line-height:1.15;overflow-wrap:anywhere}
 .cover .ca{font-size:12px;opacity:.85;font-weight:600}
 .cover .tag{position:absolute;top:10px;right:10px;font-size:11px;font-weight:700;background:rgba(255,255,255,.92);color:#16213A;padding:2px 8px;border-radius:999px}
-.book .title{font-weight:700;line-height:1.25}
+.book .title{font-weight:700;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.5em}
+.book .author{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:-4px}
+.book .push{margin-top:auto;align-self:flex-start}
 .book .meta{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 10px}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--surface);white-space:nowrap}
 .chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
@@ -121,3 +123,16 @@ td input{width:90px;padding:5px 8px}
 .ac-list span{display:flex;flex-direction:column;min-width:0;font-size:14px;color:var(--ink)}
 .ac-list b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ac-list small{font-size:12px;color:var(--muted)}
+
+.genre{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.genre.g-0{background:#EAF1FD;color:#1D4FA8}
+.genre.g-1{background:#FDECEA;color:#A3271B}
+.genre.g-2{background:#FFF4D6;color:#8A5A00}
+.genre.g-3{background:#E6F6EE;color:#1E6B45}
+.genre.g-4{background:#F3EBFD;color:#6230A8}
+.genre.g-5{background:#E3F6F8;color:#0E6672}
+.genre.g-6{background:#F6EEE4;color:#7A4B1E}
+.genre.g-7{background:#FCE9F2;color:#9C2459}
+.genre.g-8{background:#FFEEDF;color:#A04A0B}
+.genre.g-9{background:#E9ECF5;color:#36406B}
+.genre.g-10{background:#F0F1F3;color:#4A5160}

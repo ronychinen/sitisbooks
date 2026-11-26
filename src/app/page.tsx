@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getSession } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
+import GenreTag from "@/components/GenreTag";
 import { GENRES, type CatalogBook } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
@@ -54,11 +55,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
           {books.map((b) => (
             <article className="book" key={b.id}>
               <BookCover title={b.title} author={b.author} url={b.cover_url} tag={b.condition} />
-              <div className="title">{b.title}</div>
-              <div className="meta"><span>{b.author}</span><span>· {b.genre}</span></div>
+              <div className="title" title={b.title}>{b.title}</div>
+              <div className="author" title={b.author}>{b.author}</div>
+              <div><GenreTag genre={b.genre} /></div>
               {b.is_mine
-                ? <span className="chip s-disponible">Tu libro</span>
-                : <Link className="btn sm" href={`/pedir/${b.id}`}>Pedir este libro</Link>}
+                ? <span className="chip s-disponible push">Tu libro</span>
+                : <Link className="btn sm push" href={`/pedir/${b.id}`}>Pedir este libro</Link>}
             </article>
           ))}
         </div>

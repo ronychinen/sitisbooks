@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireProfile } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
+import GenreTag from "@/components/GenreTag";
 import { soles, tariffFor, type CatalogBook, type Settings } from "@/lib/constants";
 import RequestButton from "./RequestButton";
 
@@ -25,7 +26,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       <div style={{ maxWidth: 280 }}><BookCover title={b.title} author={b.author} url={b.cover_url} tag={b.condition} /></div>
       <section className="stack">
         <div>
-          <p className="eyebrow">{b.genre}</p>
+          <div><GenreTag genre={b.genre} /></div>
           <h1 style={{ fontSize: 32 }}>{b.title}</h1>
           <p className="muted" style={{ marginTop: 4 }}>{b.author} · {b.condition}</p>
         </div>
