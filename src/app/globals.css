@@ -1,14 +1,11 @@
 :root{
-  --bg:#EFF1EA; --surface:#FBFCF8; --ink:#17201C; --muted:#5C6760; --line:#D5DACF;
-  --accent:#1F5C4A; --accent-ink:#FFFFFF; --accent-soft:#D9E8E0; --highlight:#E7B53C;
-  --ok:#2E7D4F; --warn:#B7791F; --bad:#B23A3A; --info:#2C5AA0;
+  --bg:#F7F9FC; --surface:#FFFFFF; --ink:#16213A; --muted:#5B6478; --line:#E3E8F0;
+  --accent:#2F6BDB; --accent-ink:#FFFFFF; --accent-soft:#EAF1FD; --highlight:#8DB8F2;
+  --ok:#2E7D4F; --warn:#B7791F; --bad:#B23A3A; --info:#2F6BDB;
   --r:10px;
   --f-display:"Young Serif"; --f-body:"Figtree"; --f-mono:"JetBrains Mono";
+  color-scheme:light;
 }
-@media (prefers-color-scheme: dark){:root{
-  --bg:#121815; --surface:#1A221E; --ink:#E7ECE6; --muted:#9AA69F; --line:#2D3832;
-  --accent:#6CC3A3; --accent-ink:#0E1512; --accent-soft:#1F3A30;
-  --ok:#5FC08A; --warn:#E0A84A; --bad:#E07070; --info:#7FA7E6; color-scheme:dark}}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body),system-ui,sans-serif;font-size:15px;line-height:1.5}
@@ -60,7 +57,7 @@ label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600}
 .cover.typo::before{content:"";position:absolute;left:0;top:0;bottom:0;width:8px;background:rgba(0,0,0,.18)}
 .cover .ct{font-family:var(--f-display),Georgia,serif;font-size:18px;line-height:1.15;overflow-wrap:anywhere}
 .cover .ca{font-size:12px;opacity:.85;font-weight:600}
-.cover .tag{position:absolute;top:10px;right:10px;font-size:11px;font-weight:700;background:rgba(255,255,255,.92);color:#17201C;padding:2px 8px;border-radius:999px}
+.cover .tag{position:absolute;top:10px;right:10px;font-size:11px;font-weight:700;background:rgba(255,255,255,.92);color:#16213A;padding:2px 8px;border-radius:999px}
 .book .title{font-weight:700;line-height:1.25}
 .book .meta{font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 10px}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--surface);white-space:nowrap}
