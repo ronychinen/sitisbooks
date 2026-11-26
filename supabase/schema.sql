@@ -547,6 +547,7 @@ begin
   if r.id is null then raise exception 'Intercambio no encontrado'; end if;
   if r.status in ('entregado','cancelado') then raise exception 'Este intercambio ya está cerrado'; end if;
   if p_status = 'coordinando' and p_pickup is null then raise exception 'Programa la fecha de recojo'; end if;
+  if p_status = 'coordinando' and p_delivery is null then raise exception 'Programa también la fecha de entrega: se le envía al solicitante'; end if;
   if p_status = 'en_camino' and p_delivery is null then raise exception 'Programa la fecha de entrega'; end if;
 
   update public.requests set status = p_status, pickup_at = p_pickup, delivery_at = p_delivery, admin_note = p_note
@@ -724,12 +725,18 @@ begin
       v_subject := 'Pago confirmado: entrega por coordinar'; v_title := '¡Pago confirmado!';
       v_body := 'Confirmamos el pago de <b>' || public.html_esc(r.book_title) || '</b>. Ahora coordinamos el recojo con quien lo dona y te avisaremos la fecha.';
     when 'coordinando' then
-      v_subject := 'Recojo programado para tu libro'; v_title := 'Recojo programado';
-      v_body := 'Recogeremos <b>' || public.html_esc(r.book_title) || '</b> el <b>' || coalesce(public.fmt_lima(r.pickup_at), 'día por confirmar') || '</b>. Luego te lo llevamos.';
+      v_subject := 'Envío programado para tu libro'; v_title := 'Envío programado';
+      v_body := 'El libro <b>' || public.html_esc(r.book_title) || '</b> te llegará a '
+        || case lower(coalesce(r.delivery_label,'')) when 'casa' then 'tu casa' when 'trabajo' then 'tu trabajo' when 'departamento' then 'tu departamento'
+             when '' then 'tu dirección' else 'tu dirección «' || public.html_esc(r.delivery_label) || '»' end
+        || coalesce(' (' || public.html_esc(r.delivery_address) || ')', '')
+        || case when r.delivery_at is null then ' en la fecha que te confirmaremos pronto.'
+             else ' el día <b>' || to_char(r.delivery_at at time zone 'America/Lima', 'DD/MM/YYYY') || '</b> a las <b>' || to_char(r.delivery_at at time zone 'America/Lima', 'HH24:MI') || '</b>.' end;
     when 'en_camino' then
       v_subject := 'Tu libro está en camino'; v_title := '¡Tu libro está en camino!';
       v_body := 'Entregaremos <b>' || public.html_esc(r.book_title) || '</b> en ' || coalesce(public.html_esc(r.delivery_label) || ': ', '') || coalesce(public.html_esc(r.delivery_address), 'tu dirección')
-        || ' el <b>' || coalesce(public.fmt_lima(r.delivery_at), 'día por confirmar') || '</b>. Por favor, que alguien esté para recibirlo.';
+        || coalesce(' el día <b>' || to_char(r.delivery_at at time zone 'America/Lima', 'DD/MM/YYYY') || '</b> a las <b>' || to_char(r.delivery_at at time zone 'America/Lima', 'HH24:MI') || '</b>', '')
+        || '. Por favor, que alguien esté para recibirlo.';
     when 'entregado' then
       v_subject := 'Tu libro fue entregado'; v_title := '¡Que lo disfrutes!';
       v_body := 'Entregamos <b>' || public.html_esc(r.book_title) || '</b>. Si tienes libros que ya leíste, dónalos y gana créditos para tu próximo pedido.';
@@ -744,7 +751,8 @@ begin
     || '<div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #E3E8F0;border-radius:12px;padding:28px">'
     || '<p style="margin:0 0 16px;font-size:20px;font-weight:bold;color:#16213A">Sitisbooks</p>'
     || '<h1 style="margin:0 0 12px;font-size:22px;color:#16213A">' || v_title || '</h1>'
-    || '<p style="margin:0 0 20px;font-size:15px;line-height:1.55;color:#3B4A66">Hola ' || public.html_esc(p.first_name) || ', ' || v_body || '</p>'
+    || '<p style="margin:0 0 8px;font-size:15px;line-height:1.55;color:#3B4A66">Hola ' || public.html_esc(initcap(trim(coalesce(p.first_name,'') || ' ' || coalesce(p.last_name,'')))) || ',</p>'
+    || '<p style="margin:0 0 20px;font-size:15px;line-height:1.55;color:#3B4A66">' || v_body || '</p>'
     || '<a href="' || v_link || '" style="display:inline-block;background:#2F6BDB;color:#fff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:10px">Ver mi pedido</a>'
     || '<p style="margin:24px 0 0;font-size:12px;color:#5B6478">Recibes este correo porque hiciste un pedido en Sitisbooks.</p>'
     || '</div></div>';
