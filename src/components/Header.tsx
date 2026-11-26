@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Logo from "./Logo";
 import { getSession } from "@/lib/supabase/server";
 import NavLinks from "./NavLinks";
 import Avatar from "./Avatar";
@@ -15,7 +16,7 @@ export default async function Header() {
   return (
     <header className="top">
       <div className="wrap topbar">
-        <Link href="/" className="logo"><i aria-hidden="true" />Sitisbooks</Link>
+        <Link href="/" className="logo"><Logo size={36} />Sitisbooks</Link>
         <NavLinks links={links}>
           {profile && <Link href="/creditos" className="credits" aria-describedby="credits-tip">Créditos <b>{profile.credits}</b><span className="plus" aria-hidden="true">+</span><span role="tooltip" id="credits-tip" className="tip">Cada crédito te permite pedir 1 libro. Toca para comprar más.</span></Link>}
         </NavLinks>

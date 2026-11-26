@@ -14,8 +14,8 @@ img{max-width:100%}
 .wrap{max-width:1120px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 header.top{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
 .topbar{display:flex;align-items:center;gap:16px;padding-block:12px;flex-wrap:wrap}
-.logo{font-family:var(--f-display),Georgia,serif;font-size:24px;display:flex;align-items:center;gap:8px;text-decoration:none}
-.logo i{display:inline-block;width:10px;height:26px;background:var(--accent);border-radius:2px;box-shadow:13px 0 0 var(--highlight);margin-right:12px}
+.logo{font-family:var(--f-display),Georgia,serif;font-size:24px;display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo svg{flex:none;display:block}
 nav.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto;align-items:center}
 nav.tabs a{font-weight:600;font-size:14px;color:var(--muted);padding:8px 12px;border-radius:999px;text-decoration:none}
 nav.tabs a[aria-current="page"]{background:var(--accent-soft);color:var(--ink)}
