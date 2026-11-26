@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { contactViolation } from "@/lib/constants";
+import BookCover from "@/components/BookCover";
 
-type Sug = { url: string; title: string; author: string; year?: string };
+type Sug = { url: string; title: string; author: string; year?: string; source?: string };
 
 /** Agregar un libro a la lista de deseos, con sugerencias de título y portada. */
 export default function WishForm({ full }: { full: boolean }) {
@@ -19,6 +20,26 @@ export default function WishForm({ full }: { full: boolean }) {
   const [error, setError] = useState("");
   const typed = useRef(false);
   const req = useRef(0);
+  const [cands, setCands] = useState<Sug[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const lastQuery = useRef("");
+
+  // Portadas: busca sola cuando hay título y autor (igual que en Donar)
+  useEffect(() => {
+    const t = title.trim(), a = author.trim();
+    const key = `${t}|${a}`;
+    if (cover || t.length < 2 || a.length < 2 || contactViolation(t) || contactViolation(a) || key === lastQuery.current) return;
+    const timer = setTimeout(async () => {
+      lastQuery.current = key;
+      setSearching(true); setCands(null);
+      try {
+        const j = await fetch(`/api/covers?title=${encodeURIComponent(t)}&author=${encodeURIComponent(a)}`).then((r) => r.json());
+        if (lastQuery.current === key) setCands((j.candidates ?? []).slice(0, 8));
+      } catch { if (lastQuery.current === key) setCands([]); }
+      if (lastQuery.current === key) setSearching(false);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [title, author, cover]);
 
   useEffect(() => {
     const q = title.trim();
@@ -36,7 +57,8 @@ export default function WishForm({ full }: { full: boolean }) {
   function choose(s: Sug) {
     typed.current = false; req.current++;
     setTitle(s.title.slice(0, 160)); setAuthor(s.author.slice(0, 120)); setCover(s.url);
-    setSugs([]); setOpen(false); setError("");
+    lastQuery.current = `${s.title.trim()}|${s.author.trim()}`;
+    setCands([s]); setSugs([]); setOpen(false); setError("");
   }
 
   async function submit(e: React.FormEvent) {
@@ -47,7 +69,7 @@ export default function WishForm({ full }: { full: boolean }) {
     const { error } = await createClient().rpc("add_wish", { p_title: title, p_author: author, p_cover_url: cover });
     setBusy(false);
     if (error) { setError(error.message); return; }
-    setTitle(""); setAuthor(""); setCover(null);
+    setTitle(""); setAuthor(""); setCover(null); setCands(null); lastQuery.current = "";
     router.refresh();
   }
 
@@ -79,8 +101,35 @@ export default function WishForm({ full }: { full: boolean }) {
             </ul>
           )}
         </label>
-        <label>Autor<input required maxLength={120} value={author} onChange={(e) => setAuthor(e.target.value)} /></label>
+        <label>Autor<input required maxLength={120} value={author} onChange={(e) => { setAuthor(e.target.value); setCover(null); }} /></label>
       </div>
+      {cover ? (
+        <div className="row" style={{ alignItems: "center", flexWrap: "nowrap" }}>
+          <div style={{ width: 64, flex: "none" }}><BookCover title={title || "Sin título"} url={cover} /></div>
+          <div className="stack" style={{ gap: 6 }}>
+            <b style={{ fontSize: 14 }}>Portada elegida</b>
+            <button type="button" className="linkbtn" style={{ alignSelf: "flex-start" }} onClick={() => setCover(null)}>Cambiar portada</button>
+          </div>
+        </div>
+      ) : searching ? (
+        <p className="muted" style={{ margin: 0 }}>Buscando portadas…</p>
+      ) : cands ? (
+        cands.length > 0 ? (
+          <div className="stack" style={{ gap: 8 }}>
+            <b style={{ fontSize: 14 }}>Elige la portada (opcional)</b>
+            <div className="covers">
+              {cands.map((c) => (
+                <button type="button" key={c.url} aria-pressed={cover === c.url} onClick={() => setCover(c.url)}>
+                  <BookCover title={c.title} url={c.url} />
+                  <small>{c.title}{c.author ? <><br />{c.author}</> : null}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : <p className="muted" style={{ margin: 0 }}>No encontramos portadas. Puedes agregarlo igual.</p>
+      ) : (
+        <p className="muted" style={{ fontSize: 13, margin: 0 }}>Escribe el título y el autor: buscaremos la portada automáticamente.</p>
+      )}
       {error && <p className="error">{error}</p>}
       <button className="btn" disabled={busy} style={{ alignSelf: "flex-start" }}>{busy ? "Agregando…" : "Agregar a mi lista"}</button>
     </form>
