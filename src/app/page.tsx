@@ -52,6 +52,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
           {!user && <span className="lp-note">Al registrarte recibes <b>1 crédito de bienvenida</b>.</span>}
         </div>
         <div className="lp-stack" aria-label="Últimos libros publicados">
+          <div className="lp-covers">
           {[0, 1, 2].map((i) => {
             const b = latest[i];
             const slot = `lp-book lp-b${i + 1}`;
@@ -61,6 +62,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
               ? <Link key={b.book_key} href={`/pedir/${b.request_id}`} className={slot} title={`${b.title} · ${b.author}`}>{cover}</Link>
               : <div key={b.book_key} className={slot} title={`${b.title} · ${b.author}`}>{cover}</div>;
           })}
+          </div>
           <div className="lp-toast" aria-hidden="true"><span>+1</span><p><b>Crédito ganado</b><br />Tu libro llegó a su nuevo lector</p></div>
         </div>
       </section>
