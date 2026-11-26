@@ -37,6 +37,7 @@ export type Profile = {
   district: string; address: string; reference: string | null; credits: number;
   donated: number; received: number; is_admin: boolean; created_at: string;
   terms_version: string | null; terms_accepted_at: string | null; banned_at: string | null; ban_reason: string | null;
+  avatar_url: string | null;
 };
 
 /**

@@ -26,6 +26,8 @@ alter table public.profiles add column if not exists terms_version text;
 alter table public.profiles add column if not exists terms_accepted_at timestamptz;
 alter table public.profiles add column if not exists banned_at timestamptz;
 alter table public.profiles add column if not exists ban_reason text;
+-- v11: foto de perfil
+alter table public.profiles add column if not exists avatar_url text;
 
 -- ---------- Direcciones (v4: varias por usuario: casa, trabajo, etc.) ----------
 create table if not exists public.addresses (
@@ -349,6 +351,17 @@ begin
   if not found then raise exception 'Completa tu perfil primero'; end if;
 end $$;
 
+-- Foto de perfil: solo una imagen subida por el mismo usuario a su carpeta del bucket "avatares" (o null para quitarla)
+create or replace function public.set_avatar(p_url text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if p_url is not null and position('/storage/v1/object/public/avatares/' || auth.uid()::text || '/' in p_url) = 0 then
+    raise exception 'Imagen no válida';
+  end if;
+  update public.profiles set avatar_url = left(p_url, 500) where id = auth.uid();
+  if not found then raise exception 'Completa tu perfil primero'; end if;
+end $$;
+
 -- Corta cualquier acción si la cuenta está suspendida
 create or replace function public.assert_active() returns void
 language plpgsql stable security definer set search_path = public as $$
@@ -609,6 +622,7 @@ end $$;
 -- ---------- Storage ----------
 insert into storage.buckets (id, name, public) values ('comprobantes','comprobantes', false) on conflict (id) do nothing;
 insert into storage.buckets (id, name, public) values ('portadas','portadas', true) on conflict (id) do nothing;
+insert into storage.buckets (id, name, public) values ('avatares','avatares', true) on conflict (id) do nothing;
 
 drop policy if exists "subir comprobante propio" on storage.objects;
 create policy "subir comprobante propio" on storage.objects for insert to authenticated
@@ -620,6 +634,13 @@ drop policy if exists "subir portada propia" on storage.objects;
 create policy "subir portada propia" on storage.objects for insert to authenticated
   with check (bucket_id = 'portadas' and (storage.foldername(name))[1] = auth.uid()::text);
 
+drop policy if exists "subir avatar propio" on storage.objects;
+create policy "subir avatar propio" on storage.objects for insert to authenticated
+  with check (bucket_id = 'avatares' and (storage.foldername(name))[1] = auth.uid()::text);
+drop policy if exists "borrar avatar propio" on storage.objects;
+create policy "borrar avatar propio" on storage.objects for delete to authenticated
+  using (bucket_id = 'avatares' and (storage.foldername(name))[1] = auth.uid()::text);
+
 -- ---------- Permisos de ejecución ----------
 revoke execute on all functions in schema public from public, anon;
 grant execute on function public.is_admin to anon, authenticated;
@@ -627,7 +648,7 @@ grant execute on function public.save_profile, public.publish_book, public.withd
   public.submit_payment, public.cancel_my_request, public.admin_review_payment, public.admin_update_request,
   public.admin_set_credits, public.update_contact, public.save_address, public.delete_address,
   public.buy_credits, public.admin_review_credit_purchase, public.quote_delivery,
-  public.accept_terms, public.admin_set_ban to authenticated;
+  public.accept_terms, public.admin_set_ban, public.set_avatar to authenticated;
 
 -- ---------- Permisos de tablas (proyectos Supabase desde mayo 2026 no exponen tablas por defecto) ----------
 -- RLS sigue limitando qué filas ve cada usuario.

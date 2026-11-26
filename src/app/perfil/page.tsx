@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAddresses, getSession } from "@/lib/supabase/server";
 import AddressBook from "./AddressBook";
+import AvatarUploader from "./AvatarUploader";
 import ProfileForm from "./ProfileForm";
 
 export const metadata = { title: "Mi perfil", robots: { index: false, follow: false } };
@@ -24,6 +25,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ b
           {isNew && <> Al terminar recibes <b>1 crédito de bienvenida</b>.</>}
         </p>
       </div>
+      {!isNew && profile && <AvatarUploader userId={user.id} url={profile.avatar_url} name={`${profile.first_name} ${profile.last_name}`} />}
       <ProfileForm email={user.email ?? ""} profile={profile} next={sp.next || "/"} isNew={isNew} />
       {!isNew && <AddressBook addresses={addresses} />}
       {!isNew && (
