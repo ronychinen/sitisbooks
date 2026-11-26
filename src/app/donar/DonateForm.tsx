@@ -50,6 +50,16 @@ export default function DonateForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, author]);
 
+  // Al elegir una portada, completa el autor con el de esa edición (sin relanzar la búsqueda)
+  function pick(c: Candidate) {
+    setPicked(c.url);
+    const a = c.author.trim().slice(0, 120);
+    if (a && !contactViolation(a)) {
+      lastQuery.current = `${title.trim()}|${a}`;
+      setAuthor(a);
+    }
+  }
+
   async function upload(file: File) {
     if (!file.type.startsWith("image/")) { setError("Sube una imagen (JPG o PNG)."); return; }
     if (file.size > 5 * 1024 * 1024) { setError("La imagen pesa más de 5 MB."); return; }
@@ -111,9 +121,9 @@ export default function DonateForm() {
               <b>¿Cuál es la portada de tu libro?</b>
               <div className="covers">
                 {candidates.map((c) => (
-                  <button type="button" key={c.url} aria-pressed={picked === c.url} onClick={() => setPicked(c.url)}>
+                  <button type="button" key={c.url} aria-pressed={picked === c.url} onClick={() => pick(c)}>
                     <BookCover title={c.title} url={c.url} />
-                    <small>{c.title}{c.year ? ` · ${c.year}` : ""}<br />{c.source}</small>
+                    <small>{c.title}{c.year ? ` · ${c.year}` : ""}{c.author ? <><br />{c.author}</> : null}<br />{c.source}</small>
                   </button>
                 ))}
               </div>
