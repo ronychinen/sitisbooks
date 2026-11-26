@@ -9,8 +9,11 @@ export const metadata = { title: "Donar un libro", robots: { index: false, follo
 export const dynamic = "force-dynamic";
 const LABEL: Record<string, string> = { disponible: "Disponible", reservado: "Reservado", entregado: "Donado", retirado: "Retirado" };
 
-export default async function Page() {
+export default async function Page({ searchParams }: { searchParams: Promise<{ title?: string; author?: string; cover?: string }> }) {
+  const sp = await searchParams;
   const { supabase } = await requireProfile("/donar");
+  const cover = sp.cover && /^https:\/\//.test(sp.cover) ? sp.cover.slice(0, 500) : null;
+  const initial = sp.title ? { title: sp.title.slice(0, 160), author: (sp.author ?? "").slice(0, 120), cover } : undefined;
   const [{ data }, addresses] = await Promise.all([
     supabase.from("my_books").select("*").order("created_at", { ascending: false }),
     getAddresses(supabase),
@@ -23,7 +26,8 @@ export default async function Page() {
           <h2>Publica un libro para donar</h2>
           <p className="muted" style={{ marginTop: 6 }}>Lo recogemos en la dirección que elijas. Ganas 1 crédito cuando llega a su nuevo lector. Sitisbooks coordina contigo el recojo: nadie más ve tus datos.</p>
         </div>
-        <DonateForm addresses={addresses} />
+        {initial && <p className="note" style={{ margin: 0 }}>Alguien tiene este libro en su lista de deseos. Al donarlo, lo verá disponible.</p>}
+        <DonateForm addresses={addresses} initial={initial} />
       </section>
       <section className="stack">
         <h3>Tus libros publicados</h3>

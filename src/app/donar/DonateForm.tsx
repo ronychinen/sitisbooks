@@ -10,23 +10,24 @@ import type { Address } from "@/lib/constants";
 type Candidate = { url: string; source: string; title: string; author: string; year?: string };
 type CoverChoice = { kind: "none" } | { kind: "url"; url: string } | { kind: "upload"; url: string };
 
-export default function DonateForm({ addresses }: { addresses: Address[] }) {
+export default function DonateForm({ addresses, initial }: { addresses: Address[]; initial?: { title: string; author: string; cover: string | null } }) {
   const supabase = createClient();
   const router = useRouter();
-  const [title, setTitle] = useState("");
-  const [author, setAuthor] = useState("");
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [author, setAuthor] = useState(initial?.author ?? "");
   const [genre, setGenre] = useState("");
   const [condition, setCondition] = useState("");
   const [addressId, setAddressId] = useState(addresses[0]?.id ?? "");
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
-  const [cover, setCover] = useState<CoverChoice | null>(null);
+  // Desde la lista de deseos llega con portada: se usa tal cual (se puede cambiar)
+  const [cover, setCover] = useState<CoverChoice | null>(initial?.cover ? { kind: "url", url: initial.cover } : null);
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
-  const lastQuery = useRef("");
+  const lastQuery = useRef(initial?.cover ? `${initial.title.trim()}|${initial.author.trim()}` : "");
   const [sugs, setSugs] = useState<Candidate[]>([]);
   const [sugOpen, setSugOpen] = useState(false);
   const [sugIdx, setSugIdx] = useState(-1);

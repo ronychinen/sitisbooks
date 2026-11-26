@@ -105,3 +105,8 @@ export const mapsLink = (lat: number | null | undefined, lng: number | null | un
   lat != null && lng != null
     ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(text)}`;
+
+/** Una tarjeta del catálogo de deseos (vista wish_catalog): sin datos de quién lo pide. */
+export type WishItem = { book_key: string; title: string; author: string; cover_url: string | null; wanted: number; is_mine: boolean | null; available: number; created_at: string };
+export type Wish = { id: string; user_id: string; title: string; author: string; cover_url: string | null; book_key: string; created_at: string };
+export const MAX_WISHES = 5;

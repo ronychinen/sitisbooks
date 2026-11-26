@@ -557,6 +557,9 @@ begin
     update public.profiles set credits = credits + 1, donated = donated + 1 where id = r.donor_id;
     update public.profiles set received = received + 1 where id = r.requester_id;
     update public.requests set credit_granted = true, delivered_at = coalesce(p_delivery, now()) where id = r.id;
+    -- Quien lo recibió ya lo tiene: sale de su lista de deseos
+    delete from public.wishes w using public.books b
+     where b.id = r.book_id and w.user_id = r.requester_id and w.book_key = public.book_key(b.title, b.author);
   elsif p_status = 'cancelado' then
     update public.books set status = 'disponible' where id = r.book_id and status = 'reservado';
     update public.profiles set credits = credits + 1 where id = r.requester_id;
@@ -568,6 +571,47 @@ language plpgsql security definer set search_path = public as $$
 begin
   if not public.is_admin() then raise exception 'Solo admin'; end if;
   update public.profiles set credits = greatest(p_credits, 0) where id = p_user;
+end $$;
+
+-- ---------- Lista de deseos (v12) ----------
+create table if not exists public.wishes (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references public.profiles(id) on delete cascade,
+  title       text not null check (char_length(title) between 1 and 160),
+  author      text not null check (char_length(author) between 1 and 120),
+  cover_url   text,
+  book_key    text not null,
+  created_at  timestamptz not null default now(),
+  unique (user_id, book_key)
+);
+create index if not exists wishes_key_idx on public.wishes(book_key);
+alter table public.wishes enable row level security;
+drop policy if exists "deseos propios o admin" on public.wishes;
+create policy "deseos propios o admin" on public.wishes for select using (user_id = auth.uid() or public.is_admin());
+
+create or replace function public.add_wish(p_title text, p_author text, p_cover_url text) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare v_id uuid; v_err text; v_key text;
+begin
+  perform public.assert_active();
+  if not exists (select 1 from public.profiles where id = auth.uid()) then raise exception 'Completa tu perfil primero'; end if;
+  if char_length(trim(coalesce(p_title,''))) = 0 or char_length(trim(coalesce(p_author,''))) = 0 then raise exception 'Escribe el título y el autor'; end if;
+  v_err := public.contact_violation(p_title); if v_err is not null then raise exception 'El título %', v_err; end if;
+  v_err := public.contact_violation(p_author); if v_err is not null then raise exception 'El autor %', v_err; end if;
+  if (select count(*) from public.wishes where user_id = auth.uid()) >= 5 then raise exception 'Puedes tener hasta 5 libros en tu lista de deseos'; end if;
+  v_key := public.book_key(p_title, p_author);
+  if exists (select 1 from public.wishes where user_id = auth.uid() and book_key = v_key) then raise exception 'Ese libro ya está en tu lista'; end if;
+  insert into public.wishes (user_id, title, author, cover_url, book_key)
+  values (auth.uid(), left(trim(p_title),160), left(trim(p_author),120), nullif(left(coalesce(p_cover_url,''),500),''), v_key)
+  returning id into v_id;
+  return v_id;
+end $$;
+
+create or replace function public.remove_wish(p_id uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  delete from public.wishes where id = p_id and user_id = auth.uid();
+  if not found then raise exception 'Deseo no encontrado'; end if;
 end $$;
 
 -- Cotización para la página Pedir: solo devuelve el monto (no expone la ubicación del donante)
@@ -648,7 +692,7 @@ grant execute on function public.save_profile, public.publish_book, public.withd
   public.submit_payment, public.cancel_my_request, public.admin_review_payment, public.admin_update_request,
   public.admin_set_credits, public.update_contact, public.save_address, public.delete_address,
   public.buy_credits, public.admin_review_credit_purchase, public.quote_delivery,
-  public.accept_terms, public.admin_set_ban, public.set_avatar to authenticated;
+  public.accept_terms, public.admin_set_ban, public.set_avatar, public.add_wish, public.remove_wish to authenticated;
 
 -- ---------- Permisos de tablas (proyectos Supabase desde mayo 2026 no exponen tablas por defecto) ----------
 -- RLS sigue limitando qué filas ve cada usuario.
@@ -658,6 +702,7 @@ grant update on public.settings to authenticated;
 grant select on public.requests to authenticated;
 grant select on public.addresses to authenticated;
 grant select on public.credit_purchases to authenticated;
+grant select on public.wishes to authenticated;
 alter table public.district_centroids enable row level security;
 drop policy if exists "centros publicos" on public.district_centroids;
 create policy "centros publicos" on public.district_centroids for select using (true);
@@ -734,7 +779,28 @@ create or replace view public.my_requests as
   from public.requests r
   where r.requester_id = auth.uid() or r.donor_id = auth.uid();
 
-grant select on public.catalog, public.catalog_groups to anon, authenticated;
+-- Catálogo de deseos: libros que la gente quiere (sin datos de quién). Oculta los que su autor ya pidió y están en curso.
+create or replace view public.wish_catalog as
+  with active as (
+    select w.* from public.wishes w
+    where not exists (
+      select 1 from public.requests r join public.books b on b.id = r.book_id
+      where r.requester_id = w.user_id and r.status not in ('entregado','cancelado')
+        and public.book_key(b.title, b.author) = w.book_key)
+      and not exists (select 1 from public.profiles p where p.id = w.user_id and p.banned_at is not null)
+  )
+  select a.book_key,
+         (array_agg(a.title order by a.created_at))[1] as title,
+         (array_agg(a.author order by a.created_at))[1] as author,
+         (array_agg(a.cover_url order by (a.cover_url is null), a.created_at))[1] as cover_url,
+         count(*)::int as wanted,
+         bool_or(a.user_id = auth.uid()) as is_mine,
+         max(a.created_at) as created_at,
+         (select count(*)::int from public.books b where b.status = 'disponible' and public.book_key(b.title, b.author) = a.book_key) as available
+  from active a
+  group by a.book_key;
+
+grant select on public.catalog, public.catalog_groups, public.wish_catalog to anon, authenticated;
 revoke execute on function public.book_key from public;
 grant execute on function public.book_key to anon, authenticated;
 grant select on public.my_books, public.my_requests to authenticated;
