@@ -663,6 +663,123 @@ begin
   end if;
 end $$;
 
+-- ---------- Correos al solicitante cuando cambia el estado del pedido (v13) ----------
+-- Envía con la API de Brevo usando pg_net (asíncrono: si el correo falla, el cambio de estado no se afecta).
+-- La API key de Brevo se guarda UNA vez en Supabase Vault, fuera de este archivo:
+--   select vault.create_secret('xkeysib-…', 'brevo_api_key');
+create extension if not exists pg_net;
+alter table public.settings add column if not exists site_url text not null default 'https://sitisbooks.com';
+alter table public.settings add column if not exists mail_from text not null default 'sitisbooks@gmail.com';
+
+create table if not exists public.email_log (
+  id          bigint generated always as identity primary key,
+  request_id  uuid references public.requests(id) on delete set null,
+  status      text,
+  to_email    text,
+  subject     text,
+  queued      boolean not null default false,
+  error       text,
+  created_at  timestamptz not null default now()
+);
+alter table public.email_log enable row level security;
+drop policy if exists "log solo admin" on public.email_log;
+create policy "log solo admin" on public.email_log for select using (public.is_admin());
+
+-- Fecha legible en hora de Lima: "jueves 27 de noviembre, 3:30 p. m."
+create or replace function public.fmt_lima(t timestamptz) returns text language sql stable as $$
+  select case when t is null then null else
+    (array['domingo','lunes','martes','miércoles','jueves','viernes','sábado'])[extract(dow from t at time zone 'America/Lima')::int + 1]
+    || ' ' || extract(day from t at time zone 'America/Lima')::int || ' de '
+    || (array['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'])[extract(month from t at time zone 'America/Lima')::int]
+    || ', ' || ltrim(to_char(t at time zone 'America/Lima', 'HH12:MI'), '0')
+    || case when extract(hour from t at time zone 'America/Lima') < 12 then ' a. m.' else ' p. m.' end
+  end
+$$;
+
+create or replace function public.html_esc(t text) returns text language sql immutable as $$
+  select replace(replace(replace(replace(coalesce(t,''), '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), '"', '&quot;')
+$$;
+
+create or replace function public.send_status_email(p_request uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare r public.requests; p public.profiles; s public.settings; v_key text;
+        v_subject text; v_title text; v_body text; v_html text; v_link text;
+begin
+  select * into r from public.requests where id = p_request;
+  if r.id is null then return; end if;
+  select * into p from public.profiles where id = r.requester_id;
+  if p.email is null then return; end if;
+  select * into s from public.settings where id = 1;
+  v_link := s.site_url || '/mis-intercambios/' || r.id;
+
+  case r.status
+    when 'pendiente_pago' then
+      v_subject := 'Revisa el pago de tu pedido'; v_title := 'Necesitamos revisar tu pago';
+      v_body := 'No pudimos validar el comprobante de tu pedido de <b>' || public.html_esc(r.book_title) || '</b>.'
+        || coalesce(' Motivo: ' || nullif(public.html_esc(r.admin_note),'') || '.', '') || ' Sube un nuevo comprobante desde tu pedido.';
+    when 'pago_en_revision' then
+      v_subject := 'Tu pedido está en “Pago en revisión”'; v_title := 'Recibimos tu comprobante';
+      v_body := 'Estamos validando el pago de <b>' || public.html_esc(r.book_title) || '</b>. Te avisaremos apenas lo confirmemos.';
+    when 'pagado' then
+      v_subject := 'Pago confirmado: entrega por coordinar'; v_title := '¡Pago confirmado!';
+      v_body := 'Confirmamos el pago de <b>' || public.html_esc(r.book_title) || '</b>. Ahora coordinamos el recojo con quien lo dona y te avisaremos la fecha.';
+    when 'coordinando' then
+      v_subject := 'Recojo programado para tu libro'; v_title := 'Recojo programado';
+      v_body := 'Recogeremos <b>' || public.html_esc(r.book_title) || '</b> el <b>' || coalesce(public.fmt_lima(r.pickup_at), 'día por confirmar') || '</b>. Luego te lo llevamos.';
+    when 'en_camino' then
+      v_subject := 'Tu libro está en camino'; v_title := '¡Tu libro está en camino!';
+      v_body := 'Entregaremos <b>' || public.html_esc(r.book_title) || '</b> en ' || coalesce(public.html_esc(r.delivery_label) || ': ', '') || coalesce(public.html_esc(r.delivery_address), 'tu dirección')
+        || ' el <b>' || coalesce(public.fmt_lima(r.delivery_at), 'día por confirmar') || '</b>. Por favor, que alguien esté para recibirlo.';
+    when 'entregado' then
+      v_subject := 'Tu libro fue entregado'; v_title := '¡Que lo disfrutes!';
+      v_body := 'Entregamos <b>' || public.html_esc(r.book_title) || '</b>. Si tienes libros que ya leíste, dónalos y gana créditos para tu próximo pedido.';
+    when 'cancelado' then
+      v_subject := 'Tu pedido fue cancelado'; v_title := 'Pedido cancelado';
+      v_body := 'Tu pedido de <b>' || public.html_esc(r.book_title) || '</b> fue cancelado y te devolvimos 1 crédito.'
+        || coalesce(' Motivo: ' || nullif(public.html_esc(r.admin_note),'') || '.', '') || ' Si ya habías pagado, te escribiremos para coordinar la devolución.';
+    else return;
+  end case;
+
+  v_html := '<div style="font-family:Arial,Helvetica,sans-serif;background:#F7F9FC;padding:24px">'
+    || '<div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #E3E8F0;border-radius:12px;padding:28px">'
+    || '<p style="margin:0 0 16px;font-size:20px;font-weight:bold;color:#16213A">Sitisbooks</p>'
+    || '<h1 style="margin:0 0 12px;font-size:22px;color:#16213A">' || v_title || '</h1>'
+    || '<p style="margin:0 0 20px;font-size:15px;line-height:1.55;color:#3B4A66">Hola ' || public.html_esc(p.first_name) || ', ' || v_body || '</p>'
+    || '<a href="' || v_link || '" style="display:inline-block;background:#2F6BDB;color:#fff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:10px">Ver mi pedido</a>'
+    || '<p style="margin:24px 0 0;font-size:12px;color:#5B6478">Recibes este correo porque hiciste un pedido en Sitisbooks.</p>'
+    || '</div></div>';
+
+  select decrypted_secret into v_key from vault.decrypted_secrets where name = 'brevo_api_key' limit 1;
+  if v_key is null then
+    insert into public.email_log (request_id, status, to_email, subject, queued, error) values (r.id, r.status, p.email, v_subject, false, 'Falta la API key de Brevo en Vault');
+    return;
+  end if;
+
+  perform net.http_post(
+    url := 'https://api.brevo.com/v3/smtp/email',
+    headers := jsonb_build_object('api-key', v_key, 'content-type', 'application/json', 'accept', 'application/json'),
+    body := jsonb_build_object(
+      'sender', jsonb_build_object('name', 'Sitisbooks', 'email', s.mail_from),
+      'to', jsonb_build_array(jsonb_build_object('email', p.email, 'name', trim(coalesce(p.first_name,'') || ' ' || coalesce(p.last_name,'')))),
+      'subject', v_subject,
+      'htmlContent', v_html)
+  );
+  insert into public.email_log (request_id, status, to_email, subject, queued) values (r.id, r.status, p.email, v_subject, true);
+exception when others then
+  -- Un problema con el correo nunca debe bloquear el cambio de estado
+  insert into public.email_log (request_id, status, to_email, subject, queued, error) values (p_request, r.status, p.email, v_subject, false, left(sqlerrm, 300));
+end $$;
+
+create or replace function public.on_request_status_change() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.status is distinct from old.status then perform public.send_status_email(new.id); end if;
+  return new;
+end $$;
+drop trigger if exists request_status_email on public.requests;
+create trigger request_status_email after update of status on public.requests
+  for each row execute function public.on_request_status_change();
+
 -- ---------- Storage ----------
 insert into storage.buckets (id, name, public) values ('comprobantes','comprobantes', false) on conflict (id) do nothing;
 insert into storage.buckets (id, name, public) values ('portadas','portadas', true) on conflict (id) do nothing;
@@ -703,6 +820,7 @@ grant select on public.requests to authenticated;
 grant select on public.addresses to authenticated;
 grant select on public.credit_purchases to authenticated;
 grant select on public.wishes to authenticated;
+grant select on public.email_log to authenticated;
 alter table public.district_centroids enable row level security;
 drop policy if exists "centros publicos" on public.district_centroids;
 create policy "centros publicos" on public.district_centroids for select using (true);
