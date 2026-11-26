@@ -21,6 +21,12 @@ create table if not exists public.profiles (
   created_at  timestamptz not null default now()
 );
 
+-- v10: términos aceptados y suspensión de cuentas
+alter table public.profiles add column if not exists terms_version text;
+alter table public.profiles add column if not exists terms_accepted_at timestamptz;
+alter table public.profiles add column if not exists banned_at timestamptz;
+alter table public.profiles add column if not exists ban_reason text;
+
 -- ---------- Direcciones (v4: varias por usuario: casa, trabajo, etc.) ----------
 create table if not exists public.addresses (
   id          uuid primary key default gen_random_uuid(),
@@ -152,18 +158,6 @@ begin
   fee := greatest(fee, s.km_min_fee);
   if s.km_max_fee is not null then fee := least(fee, s.km_max_fee); end if;
   return round(fee, 2);
-end $$;
-
--- Cotización para la página Pedir: solo devuelve el monto (no expone la ubicación del donante)
-create or replace function public.quote_delivery(p_book uuid, p_address uuid) returns numeric
-language plpgsql stable security definer set search_path = public as $$
-declare b public.books; a public.addresses;
-begin
-  select * into b from public.books where id = p_book and status = 'disponible';
-  if b.id is null then raise exception 'Este libro ya no está disponible'; end if;
-  select * into a from public.addresses where id = p_address and user_id = auth.uid();
-  if a.id is null then raise exception 'Elige una de tus direcciones'; end if;
-  return public.delivery_fee_for(b.pickup_lat, b.pickup_lng, b.district, a.lat, a.lng, a.district);
 end $$;
 
 -- ---------- Compra de créditos (v8) ----------
@@ -309,13 +303,17 @@ create policy "intercambios solo admin" on public.requests for select
 -- ---------- Perfil ----------
 drop function if exists public.save_profile(text, text, text, text, text, text);
 drop function if exists public.save_profile(text, text, text, text, text, text, text);
+drop function if exists public.save_profile(text, text, text, text, text, text, text, double precision, double precision);
 create or replace function public.save_profile(
   p_first_name text, p_last_name text, p_phone text, p_district text, p_address text, p_reference text, p_unit text default null,
-  p_lat double precision default null, p_lng double precision default null
+  p_lat double precision default null, p_lng double precision default null, p_terms_version text default null
 ) returns void language plpgsql security definer set search_path = public as $$
 declare v_email text;
 begin
   if auth.uid() is null then raise exception 'Debes iniciar sesión'; end if;
+  if not exists (select 1 from public.profiles where id = auth.uid()) and coalesce(p_terms_version,'') = '' then
+    raise exception 'Debes aceptar los términos y condiciones';
+  end if;
   select email into v_email from auth.users where id = auth.uid();
   insert into public.profiles (id, email, first_name, last_name, phone, district, address, reference)
   values (auth.uid(), v_email, trim(p_first_name), trim(p_last_name), p_phone, p_district,
@@ -323,6 +321,9 @@ begin
   on conflict (id) do update set
     first_name = excluded.first_name, last_name = excluded.last_name, phone = excluded.phone,
     district = excluded.district, address = excluded.address, reference = excluded.reference;
+  if coalesce(p_terms_version,'') <> '' then
+    update public.profiles set terms_version = left(p_terms_version, 20), terms_accepted_at = now() where id = auth.uid();
+  end if;
   if not exists (select 1 from public.addresses where user_id = auth.uid()) then
     insert into public.addresses (user_id, label, district, address, unit, reference, is_default, lat, lng)
     values (auth.uid(), 'Casa', p_district, trim(p_address), nullif(left(trim(coalesce(p_unit,'')),30),''), nullif(trim(p_reference),''), true, p_lat, p_lng);
@@ -337,6 +338,39 @@ begin
   update public.profiles set first_name = trim(p_first_name), last_name = trim(p_last_name), phone = p_phone
   where id = auth.uid();
   if not found then raise exception 'Completa tu perfil primero'; end if;
+end $$;
+
+-- Aceptar (o volver a aceptar) los términos vigentes
+create or replace function public.accept_terms(p_version text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(p_version,'') = '' then raise exception 'Versión inválida'; end if;
+  update public.profiles set terms_version = left(p_version, 20), terms_accepted_at = now() where id = auth.uid();
+  if not found then raise exception 'Completa tu perfil primero'; end if;
+end $$;
+
+-- Corta cualquier acción si la cuenta está suspendida
+create or replace function public.assert_active() returns void
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if exists (select 1 from public.profiles where id = auth.uid() and banned_at is not null) then
+    raise exception 'Tu cuenta está suspendida. Escríbenos si crees que es un error';
+  end if;
+end $$;
+
+-- Admin: suspender o reactivar una cuenta. Al suspender, sus libros disponibles salen del catálogo.
+create or replace function public.admin_set_ban(p_user uuid, p_banned boolean, p_reason text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_admin() then raise exception 'Solo admin'; end if;
+  if p_user = auth.uid() then raise exception 'No puedes suspender tu propia cuenta'; end if;
+  if p_banned then
+    if coalesce(trim(p_reason),'') = '' then raise exception 'Escribe el motivo de la suspensión'; end if;
+    update public.profiles set banned_at = now(), ban_reason = left(trim(p_reason), 300) where id = p_user;
+    update public.books set status = 'retirado' where owner_id = p_user and status = 'disponible';
+  else
+    update public.profiles set banned_at = null, ban_reason = null where id = p_user;
+  end if;
 end $$;
 
 -- Copia la dirección predeterminada al perfil (la usan el admin y valores por defecto)
@@ -403,6 +437,7 @@ create or replace function public.publish_book(
 ) returns uuid language plpgsql security definer set search_path = public as $$
 declare a public.addresses; v_id uuid; v_err text;
 begin
+  perform public.assert_active();
   v_err := public.contact_violation(p_title);
   if v_err is not null then raise exception 'El título %', v_err; end if;
   v_err := public.contact_violation(p_author);
@@ -431,6 +466,7 @@ create or replace function public.request_book(p_book uuid, p_address uuid) retu
 language plpgsql security definer set search_path = public as $$
 declare b public.books; me public.profiles; s public.settings; a public.addresses; v_fee numeric; v_tariff numeric; v_id uuid;
 begin
+  perform public.assert_active();
   select * into me from public.profiles where id = auth.uid() for update;
   if me.id is null then raise exception 'Completa tu perfil antes de pedir libros'; end if;
   if me.credits < 1 then raise exception 'No tienes créditos. Dona un libro para ganar uno'; end if;
@@ -521,11 +557,24 @@ begin
   update public.profiles set credits = greatest(p_credits, 0) where id = p_user;
 end $$;
 
+-- Cotización para la página Pedir: solo devuelve el monto (no expone la ubicación del donante)
+create or replace function public.quote_delivery(p_book uuid, p_address uuid) returns numeric
+language plpgsql stable security definer set search_path = public as $$
+declare b public.books; a public.addresses;
+begin
+  select * into b from public.books where id = p_book and status = 'disponible';
+  if b.id is null then raise exception 'Este libro ya no está disponible'; end if;
+  select * into a from public.addresses where id = p_address and user_id = auth.uid();
+  if a.id is null then raise exception 'Elige una de tus direcciones'; end if;
+  return public.delivery_fee_for(b.pickup_lat, b.pickup_lng, b.district, a.lat, a.lng, a.district);
+end $$;
+
 -- ---------- Compra de créditos ----------
 create or replace function public.buy_credits(p_quantity int, p_method text, p_operation text, p_proof text)
 returns uuid language plpgsql security definer set search_path = public as $$
 declare v_price numeric; v_id uuid;
 begin
+  perform public.assert_active();
   if not exists (select 1 from public.profiles where id = auth.uid()) then raise exception 'Completa tu perfil primero'; end if;
   select credit_price into v_price from public.settings where id = 1;
   if v_price is null then raise exception 'La compra de créditos aún no está disponible'; end if;
@@ -577,7 +626,8 @@ grant execute on function public.is_admin to anon, authenticated;
 grant execute on function public.save_profile, public.publish_book, public.withdraw_book, public.request_book,
   public.submit_payment, public.cancel_my_request, public.admin_review_payment, public.admin_update_request,
   public.admin_set_credits, public.update_contact, public.save_address, public.delete_address,
-  public.buy_credits, public.admin_review_credit_purchase, public.quote_delivery to authenticated;
+  public.buy_credits, public.admin_review_credit_purchase, public.quote_delivery,
+  public.accept_terms, public.admin_set_ban to authenticated;
 
 -- ---------- Permisos de tablas (proyectos Supabase desde mayo 2026 no exponen tablas por defecto) ----------
 -- RLS sigue limitando qué filas ve cada usuario.

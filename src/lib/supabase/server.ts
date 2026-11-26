@@ -36,6 +36,7 @@ export type Profile = {
   id: string; email: string; first_name: string; last_name: string; phone: string;
   district: string; address: string; reference: string | null; credits: number;
   donated: number; received: number; is_admin: boolean; created_at: string;
+  terms_version: string | null; terms_accepted_at: string | null; banned_at: string | null; ban_reason: string | null;
 };
 
 /** Direcciones del usuario actual, la predeterminada primero. */
@@ -50,5 +51,8 @@ export async function requireProfile(next: string) {
   const s = await getSession();
   if (!s.user) redirect(`/ingresar?next=${encodeURIComponent(next)}`);
   if (!s.profile) redirect(`/perfil?next=${encodeURIComponent(next)}`);
+  if (s.profile?.banned_at) redirect("/suspendida");
+  const { TERMS_VERSION } = await import("@/lib/terms");
+  if (s.profile?.terms_version !== TERMS_VERSION) redirect(`/terminos/aceptar?next=${encodeURIComponent(next)}`);
   return s as { supabase: typeof s.supabase; user: NonNullable<typeof s.user>; profile: Profile };
 }

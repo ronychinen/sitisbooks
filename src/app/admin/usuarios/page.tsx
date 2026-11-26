@@ -1,4 +1,5 @@
 import { createClient, type Profile } from "@/lib/supabase/server";
+import BanToggle from "./BanToggle";
 import { fmtDT } from "@/lib/constants";
 import CreditsInput from "./CreditsInput";
 
@@ -6,13 +7,14 @@ export const dynamic = "force-dynamic";
 
 export default async function Page() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
   const { data } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
   const users = (data ?? []) as Profile[];
   if (!users.length) return <div className="empty"><p>Aún no hay usuarios registrados.</p></div>;
   return (
     <div className="table-wrap">
       <table>
-        <thead><tr><th>Nombre</th><th>Correo</th><th>Celular</th><th>Distrito</th><th>Registro</th><th>Donados</th><th>Recibidos</th><th>Créditos</th></tr></thead>
+        <thead><tr><th>Nombre</th><th>Correo</th><th>Celular</th><th>Distrito</th><th>Registro</th><th>Donados</th><th>Recibidos</th><th>Créditos</th><th>Términos</th><th>Cuenta</th></tr></thead>
         <tbody>
           {users.map((u) => (
             <tr key={u.id}>
@@ -20,6 +22,8 @@ export default async function Page() {
               <td>{u.email}</td><td className="n">{u.phone}</td><td>{u.district}</td><td>{fmtDT(u.created_at)}</td>
               <td className="n">{u.donated}</td><td className="n">{u.received}</td>
               <td><CreditsInput id={u.id} value={u.credits} /></td>
+              <td className="muted">{u.terms_accepted_at ? fmtDT(u.terms_accepted_at) : "Pendiente"}</td>
+              <td><BanToggle id={u.id} bannedAt={u.banned_at} reason={u.ban_reason} isSelf={u.id === user?.id} /></td>
             </tr>
           ))}
         </tbody>

@@ -210,3 +210,17 @@ a.lp-book:hover,a.lp-book:focus-visible{transform:rotate(0) translateY(-6px) sca
   .b-dark{min-height:0}
   .lp-cta{padding:28px}
 }
+.check{flex-direction:row!important;align-items:flex-start;gap:10px!important;font-weight:500!important;font-size:14px!important;line-height:1.45}
+.check input{width:20px;height:20px;flex:none;margin-top:1px;accent-color:var(--accent)}
+footer.foot{border-top:1px solid var(--line);background:var(--surface);margin-top:24px}
+footer.foot .wrap{display:flex;gap:8px 20px;flex-wrap:wrap;align-items:center;padding-block:20px;font-size:13px;color:var(--muted)}
+footer.foot a{color:var(--muted)}footer.foot a:hover{color:var(--ink)}
+.legal{max-width:780px;margin:0 auto;line-height:1.65}
+.legal h1{font-size:clamp(30px,4vw,40px)}
+.legal h2{font-size:22px;margin:32px 0 10px;scroll-margin-top:90px}
+.legal p,.legal li{font-size:15.5px;color:#2B3650}
+.legal ol,.legal ul{padding-left:22px}
+.legal li{margin-bottom:6px}
+.legal .toc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 20px}
+.legal .toc ol{margin:0;columns:2;column-gap:28px}
+@media (max-width:640px){.legal .toc ol{columns:1}}

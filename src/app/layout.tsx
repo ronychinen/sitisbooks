@@ -33,6 +33,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <Header />
         <main className="wrap">{children}</main>
+        <footer className="foot">
+          <div className="wrap">
+            <span>© {new Date().getFullYear()} Sitisbooks</span>
+            <a href="/terminos">Términos y condiciones</a>
+            <a href="/terminos#privacidad">Política de privacidad</a>
+          </div>
+        </footer>
       </body>
     </html>
   );
