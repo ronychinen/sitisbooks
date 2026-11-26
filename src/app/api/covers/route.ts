@@ -80,9 +80,20 @@ export async function GET(req: NextRequest) {
   const title = (req.nextUrl.searchParams.get("title") || "").trim().slice(0, 160);
   const author = (req.nextUrl.searchParams.get("author") || "").trim().slice(0, 120);
   if (title.length < 2) return NextResponse.json({ candidates: [] });
-  // Sugerencias mientras se escribe: solo Apple Books (rápido), un resultado por título + autor
+  // Sugerencias mientras se escribe: Apple Books (rápido); si la última palabra está a medias, Open Library con comodín.
+  // Solo se muestran títulos que contienen lo escrito (cada palabra como inicio de una palabra del título).
   if (req.nextUrl.searchParams.get("suggest")) {
-    const list = await appleBooks(title, "").catch(() => []);
+    const tokens = norm(title).split(/\s+/).filter(Boolean);
+    const matches = (c: Candidate) => {
+      const words = norm(c.title).split(/[^a-z0-9ñ]+/).filter(Boolean);
+      return tokens.every((t) => words.some((w) => w.startsWith(t)));
+    };
+    let list = (await appleBooks(title, "").catch(() => [])).filter(matches);
+    if (list.length < 3) {
+      const wild = tokens.map((t) => t.replace(/[^a-z0-9ñ]/g, "")).filter(Boolean).join(" ") + "*";
+      const ol = await openLibraryQuery({ q: `title:(${wild})` }).catch(() => []);
+      list = list.concat(ol.filter(matches));
+    }
     const seen = new Set<string>();
     const out = list.filter((c) => { const k = norm(`${c.title}|${c.author}`); if (seen.has(k)) return false; seen.add(k); return true; });
     return NextResponse.json({ candidates: out.slice(0, 6) }, { headers: { "Cache-Control": "public, max-age=3600" } });
