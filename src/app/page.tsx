@@ -52,7 +52,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
           {[0, 1, 2].map((i) => {
             const b = latest[i];
             const slot = `lp-book lp-b${i + 1}`;
-            if (!b) return <div key={i} className={`${slot} lp-empty`} aria-hidden="true"><span>Tu libro aquí</span></div>;
+            if (!b) return <Link key={i} href={user ? "/donar" : "/ingresar?next=/donar"} className={`${slot} lp-empty`}><span>+ Tu libro aquí</span></Link>;
             const cover = <BookCover title={b.title} author={b.author} url={b.cover_url} />;
             return b.request_id
               ? <Link key={b.book_key} href={`/pedir/${b.request_id}`} className={slot} title={`${b.title} · ${b.author}`}>{cover}</Link>
