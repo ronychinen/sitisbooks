@@ -57,6 +57,114 @@ create table if not exists public.settings (
 insert into public.settings (id) values (1) on conflict (id) do nothing;
 -- v8: precio de 1 crédito (null = venta de créditos desactivada hasta que el admin lo configure)
 alter table public.settings add column if not exists credit_price numeric(10,2) check (credit_price is null or credit_price > 0);
+-- v9: datos bancarios por separado
+alter table public.settings add column if not exists bank_name text;
+alter table public.settings add column if not exists bank_holder text;
+alter table public.settings add column if not exists bank_account text;
+alter table public.settings add column if not exists bank_cci text;
+
+-- ---------- Tarifa de delivery por distancia (v9) ----------
+-- Ruta del motorizado: base (Embajada de Brasil, Av. José Pardo 850, Miraflores) → recojo → entrega.
+-- km = (distancia en línea recta de cada tramo) × factor vial. Tarifa = base + km × precio por km, mínimo y tope opcional.
+alter table public.settings add column if not exists origin_lat double precision not null default -12.1184;
+alter table public.settings add column if not exists origin_lng double precision not null default -77.0376;
+alter table public.settings add column if not exists km_base_fare numeric(10,2) not null default 5;
+alter table public.settings add column if not exists km_price numeric(10,2) not null default 0.6;
+alter table public.settings add column if not exists km_min_fee numeric(10,2) not null default 8;
+alter table public.settings add column if not exists km_max_fee numeric(10,2);
+alter table public.settings add column if not exists road_factor numeric(4,2) not null default 1.3;
+
+-- Centro aproximado de cada distrito (OpenStreetMap); se usa cuando la dirección no tiene pin en el mapa
+create table if not exists public.district_centroids (district text primary key, lat double precision not null, lng double precision not null);
+insert into public.district_centroids (district, lat, lng) values
+  ('Ancón', -11.6968, -77.1116),
+  ('Ate', -12.0387, -76.8969),
+  ('Barranco', -12.144, -77.0203),
+  ('Breña', -12.0597, -77.0501),
+  ('Carabayllo', -11.795, -76.9893),
+  ('Chaclacayo', -11.9925, -76.7762),
+  ('Chorrillos', -12.1923, -77.009),
+  ('Cieneguilla', -12.0732, -76.7771),
+  ('Comas', -11.9329, -77.0407),
+  ('El Agustino', -12.0421, -76.9957),
+  ('Independencia', -11.989, -77.0436),
+  ('Jesús María', -12.0782, -77.0464),
+  ('La Molina', -12.0901, -76.9227),
+  ('La Victoria', -12.074, -77.0182),
+  ('Lima (Cercado)', -12.053, -77.0358),
+  ('Lince', -12.0853, -77.037),
+  ('Los Olivos', -11.966, -77.0731),
+  ('Lurigancho-Chosica', -11.9488, -76.7627),
+  ('Lurín', -12.2382, -76.7839),
+  ('Magdalena del Mar', -12.0957, -77.0682),
+  ('Miraflores', -12.1215, -77.0259),
+  ('Pachacámac', -12.1495, -76.7913),
+  ('Pucusana', -12.4685, -76.7725),
+  ('Pueblo Libre', -12.0766, -77.0679),
+  ('Puente Piedra', -11.8768, -77.0747),
+  ('Punta Hermosa', -12.3327, -76.8257),
+  ('Punta Negra', -12.3656, -76.7952),
+  ('Rímac', -12.0203, -77.0355),
+  ('San Bartolo', -12.3898, -76.7806),
+  ('San Borja', -12.0965, -76.9957),
+  ('San Isidro', -12.0979, -77.0354),
+  ('San Juan de Lurigancho', -11.9488, -76.9779),
+  ('San Juan de Miraflores', -12.1554, -76.9724),
+  ('San Luis', -12.0724, -76.9959),
+  ('San Martín de Porres', -11.9878, -77.0983),
+  ('San Miguel', -12.0791, -77.0948),
+  ('Santa Anita', -12.0433, -76.9619),
+  ('Santa María del Mar', -12.4019, -76.7737),
+  ('Santa Rosa', -11.805, -77.16),
+  ('Santiago de Surco', -12.1251, -76.9822),
+  ('Surquillo', -12.1142, -77.0105),
+  ('Villa El Salvador', -12.2169, -76.9491),
+  ('Villa María del Triunfo', -12.1766, -76.919),
+  ('Bellavista', -12.0597, -77.1112),
+  ('Callao', -12.0548, -77.1287),
+  ('Carmen de la Legua Reynoso', -12.0431, -77.0909),
+  ('La Perla', -12.0716, -77.1174),
+  ('La Punta', -12.0709, -77.163),
+  ('Mi Perú', -11.8535, -77.1204),
+  ('Ventanilla', -11.8839, -77.1232)
+on conflict (district) do update set lat = excluded.lat, lng = excluded.lng;
+
+-- Distancia en km entre dos puntos (fórmula de haversine)
+create or replace function public.km_between(lat1 double precision, lng1 double precision, lat2 double precision, lng2 double precision)
+returns double precision language sql immutable as $$
+  select 2 * 6371 * asin(sqrt(power(sin(radians(lat2 - lat1) / 2), 2) + cos(radians(lat1)) * cos(radians(lat2)) * power(sin(radians(lng2 - lng1) / 2), 2)))
+$$;
+
+-- Tarifa de delivery para un recojo y una entrega (usa el pin si existe, si no el centro del distrito)
+create or replace function public.delivery_fee_for(
+  p_from_lat double precision, p_from_lng double precision, p_from_district text,
+  p_to_lat double precision, p_to_lng double precision, p_to_district text
+) returns numeric language plpgsql stable security definer set search_path = public as $$
+declare s public.settings; fl double precision := p_from_lat; fg double precision := p_from_lng;
+        tl double precision := p_to_lat; tg double precision := p_to_lng; km double precision; fee numeric;
+begin
+  select * into s from public.settings where id = 1;
+  if fl is null or fg is null then select lat, lng into fl, fg from public.district_centroids where district = p_from_district; end if;
+  if tl is null or tg is null then select lat, lng into tl, tg from public.district_centroids where district = p_to_district; end if;
+  if fl is null or tl is null then return s.default_tariff; end if;
+  km := (public.km_between(s.origin_lat, s.origin_lng, fl, fg) + public.km_between(fl, fg, tl, tg)) * s.road_factor;
+  fee := ceil((s.km_base_fare + s.km_price * km::numeric) * 2) / 2;  -- redondeo hacia arriba a S/ 0.50
+  fee := greatest(fee, s.km_min_fee);
+  if s.km_max_fee is not null then fee := least(fee, s.km_max_fee); end if;
+  return round(fee, 2);
+end $$;
+
+-- Cotización para la página Pedir: solo devuelve el monto (no expone la ubicación del donante)
+create or replace function public.quote_delivery(p_book uuid, p_address uuid) returns numeric
+language plpgsql stable security definer set search_path = public as $$
+declare b public.books; a public.addresses;
+begin
+  select * into b from public.books where id = p_book and status = 'disponible';
+  if b.id is null then raise exception 'Este libro ya no está disponible'; end if;
+  select * into a from public.addresses where id = p_address and user_id = auth.uid();
+  if a.id is null then raise exception 'Elige una de tus direcciones'; end if;
+  return public.delivery_fee_for(b.pickup_lat, b.pickup_lng, b.district, a.lat, a.lng, a.district);
+end $$;
 
 -- ---------- Compra de créditos (v8) ----------
 create table if not exists public.credit_purchases (
@@ -335,7 +443,7 @@ begin
   if p_address is not null and a.id <> p_address then raise exception 'Elige una de tus direcciones'; end if;
   select * into s from public.settings where id = 1;
   v_fee := s.fee;
-  v_tariff := coalesce((s.tariffs ->> a.district)::numeric, s.default_tariff);
+  v_tariff := public.delivery_fee_for(b.pickup_lat, b.pickup_lng, b.district, a.lat, a.lng, a.district);
   insert into public.requests (book_id, donor_id, requester_id, book_title, book_cover, from_district, to_district, delivery_fee, platform_fee, total,
     pickup_label, pickup_address, pickup_reference, delivery_label, delivery_address, delivery_reference,
     pickup_lat, pickup_lng, delivery_lat, delivery_lng)
@@ -469,7 +577,7 @@ grant execute on function public.is_admin to anon, authenticated;
 grant execute on function public.save_profile, public.publish_book, public.withdraw_book, public.request_book,
   public.submit_payment, public.cancel_my_request, public.admin_review_payment, public.admin_update_request,
   public.admin_set_credits, public.update_contact, public.save_address, public.delete_address,
-  public.buy_credits, public.admin_review_credit_purchase to authenticated;
+  public.buy_credits, public.admin_review_credit_purchase, public.quote_delivery to authenticated;
 
 -- ---------- Permisos de tablas (proyectos Supabase desde mayo 2026 no exponen tablas por defecto) ----------
 -- RLS sigue limitando qué filas ve cada usuario.
@@ -479,6 +587,10 @@ grant update on public.settings to authenticated;
 grant select on public.requests to authenticated;
 grant select on public.addresses to authenticated;
 grant select on public.credit_purchases to authenticated;
+alter table public.district_centroids enable row level security;
+drop policy if exists "centros publicos" on public.district_centroids;
+create policy "centros publicos" on public.district_centroids for select using (true);
+grant select on public.district_centroids to anon, authenticated;
 
 -- ---------- Privacidad: vistas seguras para usuarios ----------
 -- Los usuarios NUNCA leen las tablas books/requests directamente: solo estas vistas,

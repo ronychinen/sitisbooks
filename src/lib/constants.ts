@@ -62,7 +62,20 @@ export type Settings = {
   id: number; fee: number; tariffs: Record<string, number>; default_tariff: number;
   yape_number: string | null; yape_holder: string | null; bank_info: string | null;
   credit_price: number | null;
+  bank_name: string | null; bank_holder: string | null; bank_account: string | null; bank_cci: string | null;
+  origin_lat: number; origin_lng: number; km_base_fare: number; km_price: number; km_min_fee: number; km_max_fee: number | null; road_factor: number;
 };
+export type Centroid = { district: string; lat: number; lng: number };
+const rad = (x: number) => (x * Math.PI) / 180;
+export const kmBetween = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) =>
+  2 * 6371 * Math.asin(Math.sqrt(Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lng - a.lng) / 2) ** 2));
+/** Misma fórmula que delivery_fee_for en la base de datos (para la tabla referencial del admin). */
+export function feeForKm(km: number, p: { km_base_fare: number; km_price: number; km_min_fee: number; km_max_fee: number | null }) {
+  let fee = Math.ceil((p.km_base_fare + p.km_price * km) * 2) / 2;
+  fee = Math.max(fee, p.km_min_fee);
+  if (p.km_max_fee != null) fee = Math.min(fee, p.km_max_fee);
+  return fee;
+}
 export type CreditPurchase = {
   id: string; user_id: string; quantity: number; unit_price: number; total: number; payment_method: "yape" | "transferencia";
   operation_code: string | null; proof_path: string; status: "pago_en_revision" | "aprobado" | "rechazado";
