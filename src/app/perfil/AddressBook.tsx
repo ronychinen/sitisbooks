@@ -3,9 +3,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ADDRESS_LABELS, DISTRICTS, fullAddress, type Address } from "@/lib/constants";
+import AddressPicker from "@/components/AddressPicker";
 
-type Draft = { id: string | null; label: string; district: string; address: string; unit: string; reference: string; is_default: boolean };
-const EMPTY: Draft = { id: null, label: "", district: "", address: "", unit: "", reference: "", is_default: false };
+type Draft = { id: string | null; label: string; district: string; address: string; unit: string; reference: string; is_default: boolean; lat: number | null; lng: number | null };
+const EMPTY: Draft = { id: null, label: "", district: "", address: "", unit: "", reference: "", is_default: false, lat: null, lng: null };
 const MAX = 5;
 
 export default function AddressBook({ addresses }: { addresses: Address[] }) {
@@ -21,7 +22,7 @@ export default function AddressBook({ addresses }: { addresses: Address[] }) {
     setBusy(true); setError("");
     const { error } = await supabase.rpc("save_address", {
       p_id: draft.id, p_label: draft.label, p_district: draft.district, p_address: draft.address,
-      p_reference: draft.reference, p_default: draft.is_default, p_unit: draft.unit,
+      p_reference: draft.reference, p_default: draft.is_default, p_unit: draft.unit, p_lat: draft.lat, p_lng: draft.lng,
     });
     setBusy(false);
     if (error) { setError(error.message || "No pudimos guardar la dirección."); return; }
@@ -34,7 +35,7 @@ export default function AddressBook({ addresses }: { addresses: Address[] }) {
     if (error) { setError(error.message); return; }
     router.refresh();
   }
-  const makeDefault = (a: Address) => act(() => supabase.rpc("save_address", { p_id: a.id, p_label: a.label, p_district: a.district, p_address: a.address, p_reference: a.reference ?? "", p_default: true, p_unit: a.unit ?? "" }));
+  const makeDefault = (a: Address) => act(() => supabase.rpc("save_address", { p_id: a.id, p_label: a.label, p_district: a.district, p_address: a.address, p_reference: a.reference ?? "", p_default: true, p_unit: a.unit ?? "", p_lat: a.lat, p_lng: a.lng }));
   const remove = (a: Address) => { if (confirm(`¿Eliminar la dirección "${a.label}"?`)) act(() => supabase.rpc("delete_address", { p_id: a.id })); };
   const set = (k: keyof Draft) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setDraft((d) => d && { ...d, [k]: e.target.type === "checkbox" ? (e.target as HTMLInputElement).checked : e.target.value });
@@ -54,7 +55,7 @@ export default function AddressBook({ addresses }: { addresses: Address[] }) {
             </div>
             <div className="row" style={{ gap: 10 }}>
               {!a.is_default && <button type="button" className="linkbtn" disabled={busy} onClick={() => makeDefault(a)}>Hacer predeterminada</button>}
-              <button type="button" className="linkbtn" disabled={busy} onClick={() => setDraft({ id: a.id, label: a.label, district: a.district, address: a.address, unit: a.unit ?? "", reference: a.reference ?? "", is_default: a.is_default })}>Editar</button>
+              <button type="button" className="linkbtn" disabled={busy} onClick={() => setDraft({ id: a.id, label: a.label, district: a.district, address: a.address, unit: a.unit ?? "", reference: a.reference ?? "", is_default: a.is_default, lat: a.lat, lng: a.lng })}>Editar</button>
               {addresses.length > 1 && <button type="button" className="linkbtn" disabled={busy} onClick={() => remove(a)}>Eliminar</button>}
             </div>
           </div>
@@ -75,11 +76,12 @@ export default function AddressBook({ addresses }: { addresses: Address[] }) {
               </select>
             </label>
           </div>
-          <div className="grid2 addr-line">
-            <label>Dirección<input required maxLength={160} placeholder="Av./Calle y número" value={draft.address} onChange={set("address")} /></label>
+          <AddressPicker value={draft.address} lat={draft.lat} lng={draft.lng}
+            onChange={(p) => setDraft((d) => d && { ...d, address: p.address, lat: p.lat, lng: p.lng, district: p.district ?? d.district })} />
+          <div className="grid2">
             <label>Dpto. / Oficina (opcional)<input maxLength={30} placeholder="Dpto 501, Of. 302" value={draft.unit} onChange={set("unit")} /></label>
+            <label>Referencia (opcional)<input maxLength={160} placeholder="Frente al parque, portón verde…" value={draft.reference} onChange={set("reference")} /></label>
           </div>
-          <label>Referencia (opcional)<input maxLength={160} placeholder="Frente al parque, portón verde…" value={draft.reference} onChange={set("reference")} /></label>
           {!(draft.id && draft.is_default) && (
             <label style={{ flexDirection: "row", alignItems: "center", gap: 8, fontWeight: 500 }}>
               <input type="checkbox" style={{ width: "auto" }} checked={draft.is_default} onChange={set("is_default")} /> Usar como predeterminada

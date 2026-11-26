@@ -139,3 +139,5 @@ td input{width:90px;padding:5px 8px}
 .addr{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
 .grid2.addr-line{grid-template-columns:2fr 1fr}
 @media (max-width:640px){.grid2.addr-line{grid-template-columns:1fr}}
+.mini-map{width:100%;height:220px;border-radius:var(--r);border:1px solid var(--line);overflow:hidden}
+.ac-list li.ac-brand{cursor:default;justify-content:flex-end;font-size:11px;color:var(--muted);padding:4px 8px}

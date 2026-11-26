@@ -36,7 +36,7 @@ export type MyRequest = {
 };
 export type Address = {
   id: string; user_id: string; label: string; district: string; address: string; unit: string | null; reference: string | null;
-  is_default: boolean; created_at: string;
+  lat: number | null; lng: number | null; is_default: boolean; created_at: string;
 };
 /** "Av. Larco 123, Dpto 501" */
 export const fullAddress = (a: { address: string; unit?: string | null }) => (a.unit ? `${a.address}, ${a.unit}` : a.address);
@@ -49,6 +49,7 @@ export type Request = {
   credit_granted: boolean; created_at: string; updated_at: string; delivered_at: string | null;
   pickup_label: string | null; pickup_address: string | null; pickup_reference: string | null;
   delivery_label: string | null; delivery_address: string | null; delivery_reference: string | null;
+  pickup_lat: number | null; pickup_lng: number | null; delivery_lat: number | null; delivery_lng: number | null;
 };
 export type Settings = {
   id: number; fee: number; tariffs: Record<string, number>; default_tariff: number;

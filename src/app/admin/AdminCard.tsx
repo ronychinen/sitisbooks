@@ -5,13 +5,14 @@ import { createClient } from "@/lib/supabase/client";
 import { ADMIN_FLOW, STATUS_LABEL, fmtDT, soles, type Request } from "@/lib/constants";
 import type { Profile } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
+import { mapsLink } from "@/lib/googleMaps";
 
 // Lima es UTC-5 todo el año (sin horario de verano)
 const toLocal = (iso: string | null) => (iso ? new Date(new Date(iso).getTime() - 5 * 3600e3).toISOString().slice(0, 16) : "");
 const toISO = (local: string) => (local ? `${local}:00-05:00` : null);
 const wa = (phone: string | undefined, text: string) => (phone ? `https://wa.me/51${phone}?text=${encodeURIComponent(text)}` : null);
 
-type Addr = { label: string | null; address: string | null; reference: string | null; district: string };
+type Addr = { label: string | null; address: string | null; reference: string | null; district: string; lat: number | null; lng: number | null };
 
 function Party({ label, p, a }: { label: string; p: Profile | null; a: Addr }) {
   // Dirección elegida en el intercambio; si es un intercambio antiguo, la del perfil
@@ -22,6 +23,9 @@ function Party({ label, p, a }: { label: string; p: Profile | null; a: Addr }) {
       <span className="who">{p ? `${p.first_name} ${p.last_name}` : "Usuario sin perfil"}</span>
       <span>{a.label && <b>{a.label}: </b>}{address} · {a.district}</span>
       {reference && <span className="muted">Ref.: {reference}</span>}
+      <a href={mapsLink(a.lat, a.lng, `${address}, ${a.district}, Lima, Perú`)} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13 }}>
+        {a.lat != null ? "Ver ubicación exacta en Google Maps" : "Buscar en Google Maps"} ↗
+      </a>
       <span className="ph">{p?.phone ?? "—"}</span>
       <span className="muted" style={{ fontSize: 13 }}>{p?.email}</span>
     </div>
@@ -68,8 +72,8 @@ export default function AdminCard({ r, donor, requester, proofUrl }: { r: Reques
         <div className="row"><span className={`chip s-${r.status}`}>{STATUS_LABEL[r.status]}</span><span className="chip" style={{ color: "var(--ink)" }}>{soles(r.total)}</span></div>
       </div>
 
-      <Party label="Donante · recojo" p={donor} a={{ label: r.pickup_label, address: r.pickup_address, reference: r.pickup_reference, district: r.from_district }} />
-      <Party label="Solicitante · entrega" p={requester} a={{ label: r.delivery_label, address: r.delivery_address, reference: r.delivery_reference, district: r.to_district }} />
+      <Party label="Donante · recojo" p={donor} a={{ label: r.pickup_label, address: r.pickup_address, reference: r.pickup_reference, district: r.from_district, lat: r.pickup_lat, lng: r.pickup_lng }} />
+      <Party label="Solicitante · entrega" p={requester} a={{ label: r.delivery_label, address: r.delivery_address, reference: r.delivery_reference, district: r.to_district, lat: r.delivery_lat, lng: r.delivery_lng }} />
 
       {r.status === "pago_en_revision" && (
         <div className="full panel stack" style={{ padding: 14 }}>
