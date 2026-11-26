@@ -39,9 +39,14 @@ export type Profile = {
   terms_version: string | null; terms_accepted_at: string | null; banned_at: string | null; ban_reason: string | null;
 };
 
-/** Direcciones del usuario actual, la predeterminada primero. */
+/**
+ * Direcciones del usuario actual, la predeterminada primero.
+ * Siempre filtra por su id: el admin puede leer todas por RLS, y aquí solo deben aparecer las suyas.
+ */
 export async function getAddresses(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data } = await supabase.from("addresses").select("*").order("is_default", { ascending: false }).order("created_at");
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  const { data } = await supabase.from("addresses").select("*").eq("user_id", user.id).order("is_default", { ascending: false }).order("created_at");
   return (data ?? []) as import("@/lib/constants").Address[];
 }
 

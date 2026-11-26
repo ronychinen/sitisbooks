@@ -64,7 +64,4 @@ export function streetFrom(components: google.maps.places.AddressComponent[], fa
   return fallback.split(",")[0].trim();
 }
 
-export const mapsLink = (lat: number | null | undefined, lng: number | null | undefined, text: string) =>
-  lat != null && lng != null
-    ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(text)}`;
+export { mapsLink } from "@/lib/constants";

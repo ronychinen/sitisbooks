@@ -99,3 +99,9 @@ export const fmtDT = (v: string | null | undefined) =>
   v ? new Date(v).toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Lima" }) : "—";
 export const tariffFor = (s: Settings | null, district: string) =>
   Number(s?.tariffs?.[district] ?? s?.default_tariff ?? 12);
+
+/** Enlace a Google Maps: por coordenadas si existen, si no por texto. */
+export const mapsLink = (lat: number | null | undefined, lng: number | null | undefined, text: string) =>
+  lat != null && lng != null
+    ? `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(text)}`;

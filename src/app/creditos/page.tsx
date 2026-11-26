@@ -8,10 +8,10 @@ export const metadata = { title: "Comprar créditos", robots: { index: false, fo
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  const { supabase, profile } = await requireProfile("/creditos");
+  const { supabase, user, profile } = await requireProfile("/creditos");
   const [{ data: settings }, { data: purchases }] = await Promise.all([
     supabase.from("settings").select("*").eq("id", 1).maybeSingle(),
-    supabase.from("credit_purchases").select("*").order("created_at", { ascending: false }).limit(20),
+    supabase.from("credit_purchases").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(20),
   ]);
   const s = settings as Settings | null;
   const list = (purchases ?? []) as CreditPurchase[];
