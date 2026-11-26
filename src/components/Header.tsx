@@ -15,7 +15,7 @@ export default async function Header() {
       <div className="wrap topbar">
         <Link href="/" className="logo"><i aria-hidden="true" />Sitisbooks</Link>
         <NavLinks links={links}>
-          {profile && <span className="credits" title="Cada crédito te permite pedir 1 libro">Créditos <b>{profile.credits}</b></span>}
+          {profile && <span className="credits" tabIndex={0} aria-describedby="credits-tip">Créditos <b>{profile.credits}</b><span role="tooltip" id="credits-tip" className="tip">Cada crédito te permite pedir 1 libro</span></span>}
         </NavLinks>
       </div>
     </header>
