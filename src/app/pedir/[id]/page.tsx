@@ -51,7 +51,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         <p className="note">Pagas por Yape o transferencia en el siguiente paso. Reservamos el libro para ti mientras subes tu comprobante. Sitisbooks coordina el recojo y la entrega; no compartimos tus datos con el donante.</p>
         {own ? <p className="error">Este libro es tuyo.</p>
           : unavailable ? <p className="error">Este libro ya no está disponible.</p>
-          : noCredits ? <div className="stack"><p className="error">No tienes créditos. Dona un libro para ganar uno.</p><Link className="btn" href="/donar">Donar un libro</Link></div>
+          : noCredits ? <div className="stack"><p className="error">No tienes créditos. Compra uno o dona un libro para ganarlo gratis.</p><div className="row"><Link className="btn" href="/creditos">Comprar créditos</Link><Link className="btn ghost" href="/donar">Donar un libro</Link></div></div>
           : null}
       </section>
     </div>

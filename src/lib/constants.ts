@@ -61,7 +61,14 @@ export type Request = {
 export type Settings = {
   id: number; fee: number; tariffs: Record<string, number>; default_tariff: number;
   yape_number: string | null; yape_holder: string | null; bank_info: string | null;
+  credit_price: number | null;
 };
+export type CreditPurchase = {
+  id: string; user_id: string; quantity: number; unit_price: number; total: number; payment_method: "yape" | "transferencia";
+  operation_code: string | null; proof_path: string; status: "pago_en_revision" | "aprobado" | "rechazado";
+  admin_note: string | null; created_at: string; reviewed_at: string | null;
+};
+export const PURCHASE_LABEL: Record<string, string> = { pago_en_revision: "En revisión", aprobado: "Aprobada", rechazado: "Rechazada" };
 
 /** Igual que public.contact_violation en la base de datos: bloquea datos de contacto en título y autor. */
 export function contactViolation(t: string): string | null {

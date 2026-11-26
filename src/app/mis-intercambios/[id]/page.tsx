@@ -4,6 +4,7 @@ import { requireProfile } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
 import { STATUS_LABEL, fmtD, fmtDT, soles, type MyRequest, type Settings } from "@/lib/constants";
 import PaymentForm from "./PaymentForm";
+import PayInfo from "@/components/PayInfo";
 
 export const metadata = { title: "Detalle del intercambio", robots: { index: false, follow: false } };
 
@@ -62,14 +63,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         <section className="panel stack">
           <h3>Paga y sube tu comprobante</h3>
           {r.payment_note && <p className="error">Tu comprobante anterior fue observado: {r.payment_note}</p>}
-          <div className="grid2">
-            <div className="party"><span className="eyebrow">Yape</span>
-              {s?.yape_number ? <><span className="ph">{s.yape_number}</span><span>{s.yape_holder}</span></> : <span className="muted">Pronto publicaremos el número.</span>}
-            </div>
-            <div className="party"><span className="eyebrow">Transferencia</span>
-              {s?.bank_info ? <span style={{ whiteSpace: "pre-line", userSelect: "all" }}>{s.bank_info}</span> : <span className="muted">Pronto publicaremos la cuenta.</span>}
-            </div>
-          </div>
+          <PayInfo s={s} />
           <PaymentForm requestId={r.id} total={Number(r.total)} />
         </section>
       )}

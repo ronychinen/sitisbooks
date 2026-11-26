@@ -147,7 +147,11 @@ td input{width:90px;padding:5px 8px}
 .opt{display:inline-block;font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);text-decoration:none;color:var(--ink)}
 .opt.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
 .steps .para{display:block;margin-top:6px}
-.credits{position:relative;cursor:help}
+.credits{position:relative;cursor:pointer;text-decoration:none;color:var(--ink)}
+.credits .plus{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;line-height:1}
+.credits:hover{border-color:var(--accent)}
 .credits .tip{position:absolute;top:calc(100% + 8px);right:0;z-index:30;width:max-content;max-width:220px;font-size:12px;font-weight:500;line-height:1.35;color:#fff;background:var(--ink);padding:7px 10px;border-radius:8px;opacity:0;visibility:hidden;transform:translateY(-4px);transition:opacity .15s,transform .15s;pointer-events:none}
 .credits .tip::before{content:"";position:absolute;bottom:100%;right:18px;border:5px solid transparent;border-bottom-color:var(--ink)}
 .credits:hover .tip,.credits:focus .tip,.credits:focus-within .tip{opacity:1;visibility:visible;transform:none}
+.pc-pago_en_revision{color:var(--info)} .pc-aprobado{color:var(--ok)} .pc-rechazado{color:var(--bad)}
+button.opt{font:inherit;font-size:13px;font-weight:600;cursor:pointer}

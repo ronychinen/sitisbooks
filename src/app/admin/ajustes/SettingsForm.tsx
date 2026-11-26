@@ -8,6 +8,7 @@ export default function SettingsForm({ initial }: { initial: Settings }) {
   const router = useRouter();
   const [fee, setFee] = useState(String(initial?.fee ?? 5));
   const [def, setDef] = useState(String(initial?.default_tariff ?? 12));
+  const [creditPrice, setCreditPrice] = useState(initial?.credit_price != null ? String(initial.credit_price) : "");
   const [tariffs, setTariffs] = useState<Record<string, string>>(
     Object.fromEntries(DISTRICTS.map((d) => [d, initial?.tariffs?.[d] != null ? String(initial.tariffs[d]) : ""]))
   );
@@ -23,6 +24,7 @@ export default function SettingsForm({ initial }: { initial: Settings }) {
     for (const [d, v] of Object.entries(tariffs)) if (v.trim() !== "") t[d] = Math.max(0, Number(v) || 0);
     const { error } = await createClient().from("settings").update({
       fee: Math.max(0, Number(fee) || 0), default_tariff: Math.max(0, Number(def) || 0), tariffs: t,
+      credit_price: creditPrice.trim() === "" || !(Number(creditPrice) > 0) ? null : Number(creditPrice),
       yape_number: yape.trim() || null, yape_holder: holder.trim() || null, bank_info: bank.trim() || null, updated_at: new Date().toISOString(),
     }).eq("id", 1);
     setBusy(false);
@@ -38,6 +40,7 @@ export default function SettingsForm({ initial }: { initial: Settings }) {
           <label>Comisión por intercambio (S/)<input id="fee" type="number" min={0} step="0.5" value={fee} onChange={(e) => setFee(e.target.value)} /></label>
           <label>Tarifa de delivery por defecto (S/)<input id="def" type="number" min={0} step="0.5" value={def} onChange={(e) => setDef(e.target.value)} /></label>
         </div>
+        <label>Precio de 1 crédito (S/)<input id="credit_price" type="number" min={0} step="0.5" placeholder="Vacío = venta desactivada" value={creditPrice} onChange={(e) => setCreditPrice(e.target.value)} /></label>
         <div className="grid2">
           <label>Número de Yape<input id="yape" inputMode="numeric" maxLength={9} value={yape} onChange={(e) => setYape(e.target.value.replace(/\D/g, ""))} /></label>
           <label>Titular de Yape<input id="holder" maxLength={80} value={holder} onChange={(e) => setHolder(e.target.value)} /></label>

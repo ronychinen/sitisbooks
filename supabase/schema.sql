@@ -55,6 +55,25 @@ create table if not exists public.settings (
   updated_at   timestamptz not null default now()
 );
 insert into public.settings (id) values (1) on conflict (id) do nothing;
+-- v8: precio de 1 crédito (null = venta de créditos desactivada hasta que el admin lo configure)
+alter table public.settings add column if not exists credit_price numeric(10,2) check (credit_price is null or credit_price > 0);
+
+-- ---------- Compra de créditos (v8) ----------
+create table if not exists public.credit_purchases (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references public.profiles(id) on delete cascade,
+  quantity        int not null check (quantity between 1 and 10),
+  unit_price      numeric(10,2) not null,
+  total           numeric(10,2) not null,
+  payment_method  text not null check (payment_method in ('yape','transferencia')),
+  operation_code  text,
+  proof_path      text not null,
+  status          text not null default 'pago_en_revision' check (status in ('pago_en_revision','aprobado','rechazado')),
+  admin_note      text,
+  created_at      timestamptz not null default now(),
+  reviewed_at     timestamptz
+);
+create index if not exists credit_purchases_status_idx on public.credit_purchases(status, created_at desc);
 
 -- ---------- Libros ----------
 create table if not exists public.books (
@@ -151,6 +170,10 @@ alter table public.settings enable row level security;
 alter table public.books    enable row level security;
 alter table public.requests enable row level security;
 alter table public.addresses enable row level security;
+alter table public.credit_purchases enable row level security;
+drop policy if exists "compras propias o admin" on public.credit_purchases;
+create policy "compras propias o admin" on public.credit_purchases
+  for select using (user_id = auth.uid() or public.is_admin());
 drop policy if exists "direcciones propias o admin" on public.addresses;
 create policy "direcciones propias o admin" on public.addresses
   for select using (user_id = auth.uid() or public.is_admin());
@@ -390,6 +413,42 @@ begin
   update public.profiles set credits = greatest(p_credits, 0) where id = p_user;
 end $$;
 
+-- ---------- Compra de créditos ----------
+create or replace function public.buy_credits(p_quantity int, p_method text, p_operation text, p_proof text)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare v_price numeric; v_id uuid;
+begin
+  if not exists (select 1 from public.profiles where id = auth.uid()) then raise exception 'Completa tu perfil primero'; end if;
+  select credit_price into v_price from public.settings where id = 1;
+  if v_price is null then raise exception 'La compra de créditos aún no está disponible'; end if;
+  if p_quantity is null or p_quantity < 1 or p_quantity > 10 then raise exception 'Puedes comprar de 1 a 10 créditos'; end if;
+  if p_method not in ('yape','transferencia') then raise exception 'Elige Yape o transferencia'; end if;
+  if coalesce(p_proof,'') = '' or split_part(p_proof, '/', 1) <> auth.uid()::text then raise exception 'Adjunta tu comprobante'; end if;
+  if (select count(*) from public.credit_purchases where user_id = auth.uid() and status = 'pago_en_revision') >= 3 then
+    raise exception 'Tienes compras en revisión. Espera a que las validemos';
+  end if;
+  insert into public.credit_purchases (user_id, quantity, unit_price, total, payment_method, operation_code, proof_path)
+  values (auth.uid(), p_quantity, v_price, v_price * p_quantity, p_method, nullif(left(trim(coalesce(p_operation,'')),40),''), p_proof)
+  returning id into v_id;
+  return v_id;
+end $$;
+
+create or replace function public.admin_review_credit_purchase(p_purchase uuid, p_approve boolean, p_note text)
+returns void language plpgsql security definer set search_path = public as $$
+declare c public.credit_purchases;
+begin
+  if not public.is_admin() then raise exception 'Solo admin'; end if;
+  select * into c from public.credit_purchases where id = p_purchase for update;
+  if c.id is null or c.status <> 'pago_en_revision' then raise exception 'Esta compra ya fue revisada'; end if;
+  update public.credit_purchases
+     set status = case when p_approve then 'aprobado' else 'rechazado' end,
+         admin_note = nullif(trim(coalesce(p_note,'')),''), reviewed_at = now()
+   where id = c.id;
+  if p_approve then
+    update public.profiles set credits = credits + c.quantity where id = c.user_id;
+  end if;
+end $$;
+
 -- ---------- Storage ----------
 insert into storage.buckets (id, name, public) values ('comprobantes','comprobantes', false) on conflict (id) do nothing;
 insert into storage.buckets (id, name, public) values ('portadas','portadas', true) on conflict (id) do nothing;
@@ -409,7 +468,8 @@ revoke execute on all functions in schema public from public, anon;
 grant execute on function public.is_admin to anon, authenticated;
 grant execute on function public.save_profile, public.publish_book, public.withdraw_book, public.request_book,
   public.submit_payment, public.cancel_my_request, public.admin_review_payment, public.admin_update_request,
-  public.admin_set_credits, public.update_contact, public.save_address, public.delete_address to authenticated;
+  public.admin_set_credits, public.update_contact, public.save_address, public.delete_address,
+  public.buy_credits, public.admin_review_credit_purchase to authenticated;
 
 -- ---------- Permisos de tablas (proyectos Supabase desde mayo 2026 no exponen tablas por defecto) ----------
 -- RLS sigue limitando qué filas ve cada usuario.
@@ -418,6 +478,7 @@ grant select on public.settings to anon, authenticated;
 grant update on public.settings to authenticated;
 grant select on public.requests to authenticated;
 grant select on public.addresses to authenticated;
+grant select on public.credit_purchases to authenticated;
 
 -- ---------- Privacidad: vistas seguras para usuarios ----------
 -- Los usuarios NUNCA leen las tablas books/requests directamente: solo estas vistas,
