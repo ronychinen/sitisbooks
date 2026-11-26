@@ -32,6 +32,13 @@ const ALIASES: Record<string, string> = {
   "lurigancho": "Lurigancho-Chosica", "carmen de la legua": "Carmen de la Legua Reynoso", "sjl": "San Juan de Lurigancho",
 };
 
+/** Busca uno de nuestros distritos por nombre (acepta alias comunes). */
+export function matchDistrict(name: string | null | undefined): string {
+  if (!name) return "";
+  const n = norm(name.replace(/^distrito de /i, ""));
+  return DISTRICTS.find((d) => norm(d) === n) ?? ALIASES[n] ?? "";
+}
+
 /** Traduce los componentes de Google a uno de nuestros distritos (o "" si no coincide). */
 export function districtFrom(components: google.maps.places.AddressComponent[]): string {
   const order = ["sublocality_level_1", "locality", "administrative_area_level_3", "sublocality"];
