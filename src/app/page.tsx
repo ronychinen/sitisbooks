@@ -2,7 +2,9 @@ import Link from "next/link";
 import { getSession } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
 import GenreTag from "@/components/GenreTag";
-import { GENRES, copiesLabel, type CatalogGroup } from "@/lib/constants";
+import SmoothLink from "@/components/SmoothLink";
+import CatalogFilters from "./CatalogFilters";
+import { copiesLabel, type CatalogGroup } from "@/lib/constants";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 
 const jsonLd = {
@@ -44,7 +46,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
             {user
               ? <Link className="btn lg" href="/donar">Donar un libro</Link>
               : <Link className="btn lg" href="/ingresar?next=/donar">Crear cuenta gratis</Link>}
-            <a className="btn lg ghost" href="#catalogo">Ver catálogo</a>
+            <SmoothLink className="btn lg ghost" to="catalogo">Ver catálogo</SmoothLink>
           </div>
           {!user && <span className="lp-note">Al registrarte recibes <b>1 crédito de bienvenida</b>.</span>}
         </div>
@@ -89,15 +91,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
       <div className="row between lp-shelf-head" id="catalogo">
         <h2>Libros disponibles</h2>
       </div>
-      <form className="toolbar" method="get">
-        <input name="q" type="search" placeholder="Buscar por título o autor" defaultValue={q} aria-label="Buscar" />
-        <select name="g" defaultValue={g} aria-label="Género"><option value="">Todos los géneros</option>{GENRES.map((x) => <option key={x}>{x}</option>)}</select>
-        <button className="btn ghost" type="submit" style={{ flex: "0 0 auto" }}>Filtrar</button>
-      </form>
+      <CatalogFilters q={q} g={g} />
 
       {books.length === 0 ? (
         filtered ? (
-          <div className="empty"><h3>Sin resultados</h3><p>Prueba otro título o género.</p><Link className="btn ghost" href="/">Ver todo</Link></div>
+          <div className="empty"><h3>Sin resultados</h3><p>Prueba otro título o género.</p><Link className="btn ghost" href="/#catalogo" scroll={false}>Ver todo</Link></div>
         ) : (
           <div className="empty"><h3>Aún no hay libros publicados</h3><p>Sé el primero: publica un libro que quieras donar y gana tu crédito cuando se entregue.</p><Link className="btn" href="/donar">Donar un libro</Link></div>
         )

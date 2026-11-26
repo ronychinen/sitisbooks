@@ -38,6 +38,8 @@ p{margin:0}
 .steps div{display:flex;gap:12px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
 .steps div::before{counter-increment:s;content:counter(s);font-family:var(--f-mono),monospace;font-size:13px;width:24px;height:24px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink)}
 input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 11px;width:100%;min-width:0}
+select{-webkit-appearance:none;appearance:none;padding-right:42px;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235B6478' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;background-size:16px}
+select::-ms-expand{display:none}
 textarea{resize:vertical;min-height:70px}
 label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -224,3 +226,4 @@ footer.foot a{color:var(--muted)}footer.foot a:hover{color:var(--ink)}
 .legal .toc{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 20px}
 .legal .toc ol{margin:0;columns:2;column-gap:28px}
 @media (max-width:640px){.legal .toc ol{columns:1}}
+.toolbar[aria-busy="true"] ~ .shelf{opacity:.55;transition:opacity .15s}
