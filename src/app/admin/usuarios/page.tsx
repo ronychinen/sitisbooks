@@ -18,8 +18,8 @@ export default async function Page() {
         <tbody>
           {users.map((u) => (
             <tr key={u.id}>
-              <td>{u.first_name} {u.last_name}{u.is_admin && <span className="chip" style={{ marginLeft: 8 }}>Admin</span>}</td>
-              <td>{u.email}</td><td className="n">{u.phone}</td><td>{u.district}</td><td>{fmtDT(u.created_at)}</td>
+              <td className="wrapcell">{u.first_name} {u.last_name}{u.is_admin && <span className="chip" style={{ marginLeft: 8 }}>Admin</span>}</td>
+              <td className="wrapcell">{u.email}</td><td className="n">{u.phone}</td><td>{u.district}</td><td>{fmtDT(u.created_at)}</td>
               <td className="n">{u.donated}</td><td className="n">{u.received}</td>
               <td><CreditsInput id={u.id} value={u.credits} /></td>
               <td className="muted">{u.terms_accepted_at ? fmtDT(u.terms_accepted_at) : "Pendiente"}</td>
