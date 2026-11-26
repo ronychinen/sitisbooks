@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { requireProfile } from "@/lib/supabase/server";
 import AdminNav from "./AdminNav";
 
+export const metadata = { title: "Admin", robots: { index: false, follow: false } };
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const { profile } = await requireProfile("/admin");
   if (!profile.is_admin) notFound();

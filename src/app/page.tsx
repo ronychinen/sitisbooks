@@ -3,6 +3,15 @@ import { getSession } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
 import GenreTag from "@/components/GenreTag";
 import { GENRES, type CatalogBook } from "@/lib/constants";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    { "@type": "Organization", "@id": `${SITE_URL}/#org`, name: SITE_NAME, url: SITE_URL, logo: `${SITE_URL}/apple-icon`, areaServed: { "@type": "City", name: "Lima" } },
+    { "@type": "WebSite", "@id": `${SITE_URL}/#web`, name: SITE_NAME, url: SITE_URL, description: SITE_DESCRIPTION, inLanguage: "es-PE", publisher: { "@id": `${SITE_URL}/#org` } },
+  ],
+};
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +30,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <section className="hero">
         <div>
           <p className="eyebrow">Intercambio de libros · Lima Metropolitana</p>

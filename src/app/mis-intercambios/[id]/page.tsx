@@ -5,6 +5,8 @@ import BookCover from "@/components/BookCover";
 import { STATUS_LABEL, fmtD, fmtDT, soles, type MyRequest, type Settings } from "@/lib/constants";
 import PaymentForm from "./PaymentForm";
 
+export const metadata = { title: "Detalle del intercambio", robots: { index: false, follow: false } };
+
 export const dynamic = "force-dynamic";
 const STEPS_REQ = ["pendiente_pago", "pago_en_revision", "pagado", "coordinando", "en_camino", "entregado"];
 const STEPS_DON = ["reservado", "coordinando", "en_camino", "entregado"];

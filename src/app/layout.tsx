@@ -1,11 +1,25 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, SITE_URL } from "@/lib/site";
 import "./globals.css";
 import Header from "@/components/Header";
 
 export const metadata: Metadata = {
-  title: "Sitisbooks · Dona un libro, recibe otro",
-  description: "Intercambia libros en Lima: por cada libro que donas ganas 1 crédito para pedir otro.",
+  metadataBase: new URL(SITE_URL),
+  title: { default: `${SITE_NAME} · ${SITE_TAGLINE} | Intercambio de libros en Lima`, template: `%s | ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: ["intercambio de libros", "donar libros", "libros usados Lima", "trueque de libros", "libros de segunda mano", "Lima", "Perú", "Sitisbooks"],
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website", locale: "es_PE", url: "/", siteName: SITE_NAME,
+    title: `${SITE_NAME} · ${SITE_TAGLINE}`, description: SITE_DESCRIPTION,
+  },
+  twitter: { card: "summary_large_image", title: `${SITE_NAME} · ${SITE_TAGLINE}`, description: SITE_DESCRIPTION },
+  robots: { index: true, follow: true },
+  formatDetection: { telephone: false },
 };
+
+export const viewport: Viewport = { themeColor: "#2F6BDB", width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -3,6 +3,8 @@ import { requireProfile } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
 import { STATUS_LABEL, fmtD, fmtDT, soles, type MyRequest } from "@/lib/constants";
 
+export const metadata = { title: "Mis intercambios", robots: { index: false, follow: false } };
+
 export const dynamic = "force-dynamic";
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ v?: string }> }) {

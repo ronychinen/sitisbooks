@@ -4,6 +4,8 @@ import DonateForm from "./DonateForm";
 import WithdrawButton from "./WithdrawButton";
 import type { MyBook } from "@/lib/constants";
 
+export const metadata = { title: "Donar un libro", robots: { index: false, follow: false } };
+
 export const dynamic = "force-dynamic";
 const LABEL: Record<string, string> = { disponible: "Disponible", reservado: "Reservado", entregado: "Donado", retirado: "Retirado" };
 

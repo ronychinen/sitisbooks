@@ -5,6 +5,8 @@ import GenreTag from "@/components/GenreTag";
 import { soles, tariffFor, type CatalogBook, type Settings } from "@/lib/constants";
 import RequestButton from "./RequestButton";
 
+export const metadata = { title: "Pedir libro", robots: { index: false, follow: false } };
+
 export const dynamic = "force-dynamic";
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {

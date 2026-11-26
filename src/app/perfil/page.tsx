@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/supabase/server";
 import ProfileForm from "./ProfileForm";
 
+export const metadata = { title: "Mi perfil", robots: { index: false, follow: false } };
+
 export default async function Page({ searchParams }: { searchParams: Promise<{ bienvenida?: string; next?: string }> }) {
   const sp = await searchParams;
   const { user, profile } = await getSession();
