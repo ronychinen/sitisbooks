@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
     }
     const seen = new Set<string>();
     const out = list.filter((c) => { const k = norm(`${c.title}|${c.author}`); if (seen.has(k)) return false; seen.add(k); return true; });
-    return NextResponse.json({ candidates: out.slice(0, 6) }, { headers: { "Cache-Control": "public, max-age=3600" } });
+    return NextResponse.json({ candidates: out.slice(0, 6) }, { headers: { "Cache-Control": out.length ? "public, max-age=600" : "no-store" } });
   }
   const results = await Promise.allSettled([appleBooks(title, author), openLibrary(title, author), googleBooks(title, author)]);
   const lists = results.map((r) => (r.status === "fulfilled" ? r.value : []));
@@ -106,5 +106,6 @@ export async function GET(req: NextRequest) {
   for (let i = 0; i < max && out.length < 12; i++) {
     for (const l of lists) { const c = l[i]; if (c && !seen.has(c.url)) { seen.add(c.url); out.push(c); } }
   }
-  return NextResponse.json({ candidates: out.slice(0, 12) }, { headers: { "Cache-Control": "public, max-age=3600" } });
+  // Sin resultados no se guarda en caché: puede que una fuente haya fallado por un momento
+  return NextResponse.json({ candidates: out.slice(0, 12) }, { headers: { "Cache-Control": out.length > 1 ? "public, max-age=600" : "no-store" } });
 }
