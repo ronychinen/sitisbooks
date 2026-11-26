@@ -5,7 +5,7 @@ import type { Profile } from "@/lib/supabase/server";
 import AdminCard from "./AdminCard";
 
 export const dynamic = "force-dynamic";
-const TABS = ["pago_en_revision", "pagado", "coordinando", "en_camino", "pendiente_pago", "entregado", "cancelado"];
+const TABS = ["pendiente_pago", "pago_en_revision", "pagado", "coordinando", "en_camino", "entregado", "cancelado"];
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ st?: string }> }) {
   const { st } = await searchParams;
