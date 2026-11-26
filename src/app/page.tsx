@@ -23,8 +23,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
   let query = supabase.from("catalog_groups").select("*").order("created_at", { ascending: false }).limit(120);
   if (g) query = query.eq("genre", g);
   if (q) {
-    const safe = q.replace(/[%,()]/g, " ").trim();
-    if (safe) query = query.or(`title.ilike.%${safe}%,author.ilike.%${safe}%`);
+    // Sin tildes ni mayúsculas: compara contra book_key (título|autor normalizados, igual que en la base de datos)
+    const norm = q.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9ñ]+/g, " ").trim();
+    if (norm) for (const w of norm.split(" ").slice(0, 6)) query = query.ilike("book_key", `%${w}%`);
   }
   const [{ data }, { data: last }] = await Promise.all([
     query,
