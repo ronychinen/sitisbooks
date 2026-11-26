@@ -1,11 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-type Candidate = { url: string; source: "Open Library" | "Google Books"; title: string; author: string; year?: string };
+type Candidate = { url: string; source: "Apple Books" | "Open Library" | "Google Books"; title: string; author: string; year?: string };
 
 async function openLibrary(title: string, author: string): Promise<Candidate[]> {
+  const strict = await openLibraryQuery({ title, ...(author ? { author } : {}) });
+  return strict.length ? strict : openLibraryQuery({ q: `${title} ${author}`.trim() });
+}
+
+async function openLibraryQuery(params: Record<string, string>): Promise<Candidate[]> {
   const u = new URL("https://openlibrary.org/search.json");
-  u.searchParams.set("title", title);
-  if (author) u.searchParams.set("author", author);
+  for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
   u.searchParams.set("limit", "10");
   u.searchParams.set("fields", "title,author_name,cover_i,first_publish_year");
   const r = await fetch(u, { headers: { "User-Agent": "Sitisbooks/1.0 (intercambio de libros)" }, signal: AbortSignal.timeout(6000) });
@@ -19,6 +23,33 @@ async function openLibrary(title: string, author: string): Promise<Candidate[]> 
       title: d.title,
       author: d.author_name?.[0] ?? "",
       year: d.first_publish_year ? String(d.first_publish_year) : undefined,
+    }));
+}
+
+const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+// Apple Books: sin API key y con buena cobertura de ediciones en español.
+async function appleBooks(title: string, author: string): Promise<Candidate[]> {
+  const u = new URL("https://itunes.apple.com/search");
+  u.searchParams.set("term", `${title} ${author}`.trim());
+  u.searchParams.set("media", "ebook");
+  u.searchParams.set("country", "pe");
+  u.searchParams.set("limit", "15");
+  const r = await fetch(u, { signal: AbortSignal.timeout(6000) });
+  if (!r.ok) return [];
+  const j = await r.json();
+  const authorWords = norm(author).split(/\s+/).filter((w) => w.length > 2);
+  type Item = { trackName?: string; artistName?: string; artworkUrl100?: string; releaseDate?: string };
+  return (j.results ?? [])
+    .filter((it: Item) => it.artworkUrl100 && it.trackName)
+    // Evita resúmenes y guías de otros autores
+    .filter((it: Item) => !authorWords.length || authorWords.some((w) => norm(it.artistName ?? "").includes(w)))
+    .map((it: Item) => ({
+      url: it.artworkUrl100!.replace(/\/\d+x\d+bb\./, "/600x600bb."),
+      source: "Apple Books" as const,
+      title: it.trackName!,
+      author: it.artistName ?? "",
+      year: it.releaseDate?.slice(0, 4),
     }));
 }
 
@@ -49,13 +80,13 @@ export async function GET(req: NextRequest) {
   const title = (req.nextUrl.searchParams.get("title") || "").trim().slice(0, 160);
   const author = (req.nextUrl.searchParams.get("author") || "").trim().slice(0, 120);
   if (title.length < 2) return NextResponse.json({ candidates: [] });
-  const [ol, gb] = await Promise.allSettled([openLibrary(title, author), googleBooks(title, author)]);
-  const a = ol.status === "fulfilled" ? ol.value : [];
-  const b = gb.status === "fulfilled" ? gb.value : [];
-  // Intercala ambas fuentes y quita duplicados por URL
+  const results = await Promise.allSettled([appleBooks(title, author), openLibrary(title, author), googleBooks(title, author)]);
+  const lists = results.map((r) => (r.status === "fulfilled" ? r.value : []));
+  // Intercala las fuentes (Apple primero) y quita duplicados por URL
   const seen = new Set<string>(); const out: Candidate[] = [];
-  for (let i = 0; i < Math.max(a.length, b.length) && out.length < 12; i++) {
-    for (const c of [a[i], b[i]]) if (c && !seen.has(c.url)) { seen.add(c.url); out.push(c); }
+  const max = Math.max(...lists.map((l) => l.length));
+  for (let i = 0; i < max && out.length < 12; i++) {
+    for (const l of lists) { const c = l[i]; if (c && !seen.has(c.url)) { seen.add(c.url); out.push(c); } }
   }
   return NextResponse.json({ candidates: out.slice(0, 12) }, { headers: { "Cache-Control": "public, max-age=3600" } });
 }
