@@ -3,14 +3,16 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import BookCover from "./BookCover";
 import GenreTag from "./GenreTag";
+import { isSpanish } from "@/lib/lang";
 
 type Props = { title: string; author: string; url: string | null; tag?: string; genre?: string; description?: string | null; requestHref?: string | null };
 
 /** Portada clicable del catálogo: abre un modal con la reseña del libro. */
 export default function ReviewCover({ title, author, url, tag, genre, description, requestHref }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
-  const [text, setText] = useState<string | null>(description ?? null);
-  const [state, setState] = useState<"idle" | "loading" | "none">(description ? "idle" : "idle");
+  // Reseñas guardadas en otro idioma se reemplazan por la versión en español
+  const [text, setText] = useState<string | null>(description && isSpanish(description) ? description : null);
+  const [state, setState] = useState<"idle" | "loading" | "none">("idle");
 
   function open() {
     ref.current?.showModal();

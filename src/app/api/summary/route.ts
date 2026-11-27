@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isSpanish } from "@/lib/lang";
 
 // Reseña breve de un libro: Google Books (en español si existe) → Apple Books → Open Library.
 const norm = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -74,6 +75,31 @@ async function openLibrary(title: string, author: string) {
   return txt && txt.length > 80 ? clean(txt.replace(/\(\[source\][^)]*\)|-{3,}[\s\S]*$/g, "")) : null;
 }
 
+// Traducción al español con MyMemory (gratuito, sin clave; máx. ~500 caracteres por consulta)
+async function toSpanish(t: string) {
+  const sentences = t.match(/[^.!?\n]+[.!?]*\s*/g) ?? [t];
+  const chunks: string[] = [];
+  for (const s of sentences) {
+    const last = chunks[chunks.length - 1];
+    if (last !== undefined && (last + s).length <= 450) chunks[chunks.length - 1] = last + s;
+    else chunks.push(s.slice(0, 450));
+  }
+  const out: string[] = [];
+  for (const c of chunks) {
+    const u = new URL("https://api.mymemory.translated.net/get");
+    u.searchParams.set("q", c.trim());
+    u.searchParams.set("langpair", "en|es");
+    u.searchParams.set("de", "sitisbooks@gmail.com");
+    const r = await fetch(u, { signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const tr: string | undefined = j?.responseData?.translatedText;
+    if (!tr || j.responseStatus !== 200 || /MYMEMORY WARNING|QUERY LENGTH LIMIT/i.test(tr)) return null;
+    out.push(tr.trim());
+  }
+  return out.join(" ").replace(/\s+([.,;:!?])/g, "$1");
+}
+
 export async function GET(req: NextRequest) {
   const title = (req.nextUrl.searchParams.get("title") || "").trim().slice(0, 160);
   const author = (req.nextUrl.searchParams.get("author") || "").trim().slice(0, 120);
@@ -84,9 +110,17 @@ export async function GET(req: NextRequest) {
     ["Google Books", () => google(title, author)],
     ["Open Library", () => openLibrary(title, author)],
   ];
+  // Siempre en español: la primera reseña que ya esté en español; si no hay, se traduce la primera encontrada
+  let fallback: { text: string; source: string } | null = null;
   for (const [source, f] of tries) {
     const s = await f().catch(() => null);
-    if (s) return NextResponse.json({ summary: brief(s), source }, { headers: { "Cache-Control": "public, max-age=86400" } });
+    if (!s) continue;
+    if (isSpanish(s)) return NextResponse.json({ summary: brief(s), source }, { headers: { "Cache-Control": "public, max-age=86400, s-maxage=604800" } });
+    fallback ??= { text: s, source };
+  }
+  if (fallback) {
+    const es = await toSpanish(brief(fallback.text, 650)).catch(() => null);
+    if (es && isSpanish(es)) return NextResponse.json({ summary: es, source: fallback.source, translated: true }, { headers: { "Cache-Control": "public, max-age=86400, s-maxage=2592000" } });
   }
   return NextResponse.json({ summary: null }, { headers: { "Cache-Control": "public, max-age=600" } });
 }
