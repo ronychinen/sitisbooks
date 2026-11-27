@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 // ID de cliente OAuth de Google (es público). Se muestra el botón oficial de Google dentro de sitisbooks.com.
-export const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
+export const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "1027209890591-d920g0l8q25kg9v3sfr2r4cirptqfcuc.apps.googleusercontent.com";
 
 type GoogleId = {
   initialize: (o: Record<string, unknown>) => void;
