@@ -687,7 +687,14 @@ end $$;
 -- Envía con la API de Brevo usando pg_net (asíncrono: si el correo falla, el cambio de estado no se afecta).
 -- La API key de Brevo se guarda UNA vez en Supabase Vault, fuera de este archivo:
 --   select vault.create_secret('xkeysib-…', 'brevo_api_key');
-create extension if not exists pg_net;
+create schema if not exists extensions;
+-- pg_net va en el esquema "extensions", no en public (Security Advisor). Si quedó en public, se reinstala.
+do $$ begin
+  if exists (select 1 from pg_extension e join pg_namespace n on n.oid = e.extnamespace where e.extname = 'pg_net' and n.nspname = 'public') then
+    drop extension pg_net;
+  end if;
+end $$;
+create extension if not exists pg_net with schema extensions;
 alter table public.settings add column if not exists site_url text not null default 'https://sitisbooks.com';
 alter table public.settings add column if not exists mail_from text not null default 'sitisbooks@gmail.com';
 
@@ -1116,7 +1123,7 @@ create policy "admin borra de publico" on storage.objects for delete to authenti
 -- (Supabase da EXECUTE a anon/authenticated por defecto en funciones nuevas)
 revoke execute on all functions in schema public from public, anon, authenticated;
 alter default privileges in schema public revoke execute on functions from public, anon, authenticated;
-grant execute on function public.is_admin to anon, authenticated;
+grant execute on function public.is_admin to authenticated;   -- anon no lo necesita (sus vistas no usan RLS de usuario)
 grant execute on function public.admin_delete_cancelled(uuid[]) to authenticated;
 grant execute on function public.save_profile, public.publish_book, public.withdraw_book, public.request_book,
   public.submit_payment, public.cancel_my_request, public.admin_review_payment, public.admin_update_request,
