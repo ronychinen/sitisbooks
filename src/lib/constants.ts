@@ -1,7 +1,7 @@
 export const LIMA = ["Ancón","Ate","Barranco","Breña","Carabayllo","Chaclacayo","Chorrillos","Cieneguilla","Comas","El Agustino","Independencia","Jesús María","La Molina","La Victoria","Lima (Cercado)","Lince","Los Olivos","Lurigancho-Chosica","Lurín","Magdalena del Mar","Miraflores","Pachacámac","Pucusana","Pueblo Libre","Puente Piedra","Punta Hermosa","Punta Negra","Rímac","San Bartolo","San Borja","San Isidro","San Juan de Lurigancho","San Juan de Miraflores","San Luis","San Martín de Porres","San Miguel","Santa Anita","Santa María del Mar","Santa Rosa","Santiago de Surco","Surquillo","Villa El Salvador","Villa María del Triunfo"];
 export const CALLAO = ["Bellavista","Callao","Carmen de la Legua Reynoso","La Perla","La Punta","Mi Perú","Ventanilla"];
 export const DISTRICTS = [...LIMA, ...CALLAO];
-export const GENRES = ["Novela","Literatura peruana","Infantil y juvenil","Negocios","Autoayuda","Ciencia","Historia","Poesía","Cómic y manga","Académico","Otros"];
+export const GENRES = ["Novela","Literatura peruana","Infantil y juvenil","Negocios","Autoayuda","Ciencia","Historia","Poesía","Cómic y manga","Académico","Tecnología","Diseño","Otros"];
 export const CONDITIONS = ["Nuevo","Como nuevo","Buen estado","Usado"];
 
 export const STATUS_LABEL: Record<string, string> = {
