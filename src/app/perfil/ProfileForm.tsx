@@ -33,7 +33,15 @@ export default function ProfileForm({ email, profile, next, isNew }: { email: st
       : await supabase.rpc("update_contact", { p_first_name: f.first_name, p_last_name: f.last_name, p_phone: f.phone });
     setBusy(false);
     if (error) { setError("No pudimos guardar tus datos. Inténtalo de nuevo."); return; }
-    if (isNew) { router.replace(next === "/" ? "/donar" : next); }
+    if (isNew) {
+      // Si llegó por un enlace de invitación, registra quién lo invitó
+      const ref = document.cookie.match(/(?:^|; )sb_ref=([A-Z0-9]{6})/)?.[1];
+      if (ref) {
+        await supabase.rpc("claim_referral", { p_code: ref });
+        document.cookie = "sb_ref=; Max-Age=0; path=/";
+      }
+      router.replace(next === "/" ? "/donar" : next);
+    }
     else setSaved(true);
     router.refresh();
   }

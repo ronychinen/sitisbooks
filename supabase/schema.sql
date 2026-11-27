@@ -471,6 +471,8 @@ begin
   insert into public.books (owner_id, title, author, cover_url, genre, condition, district, pickup_label, pickup_address, pickup_reference, pickup_lat, pickup_lng, description)
   values (auth.uid(), trim(p_title), trim(p_author), nullif(p_cover_url,''), p_genre, p_condition, a.district, a.label, concat_ws(', ', a.address, a.unit), a.reference, a.lat, a.lng, p_description)
   returning id into v_id;
+  -- Aviso a quienes lo tienen en su lista de deseos (nunca bloquea la publicación)
+  begin perform public.send_wish_alerts(v_id); exception when others then null; end;
   return v_id;
 end $$;
 
@@ -574,6 +576,8 @@ begin
     -- Quien lo recibió ya lo tiene: sale de su lista de deseos
     delete from public.wishes w using public.books b
      where b.id = r.book_id and w.user_id = r.requester_id and w.book_key = public.book_key(b.title, b.author);
+    -- Referidos: la primera donación entregada del invitado da 1 crédito a cada uno
+    perform public.reward_referral(r.donor_id);
   elsif p_status = 'cancelado' then
     update public.books set status = 'disponible' where id = r.book_id and status = 'reservado';
     update public.profiles set credits = credits + 1 where id = r.requester_id;
@@ -899,6 +903,160 @@ begin
   on conflict (request_id) do update set score = excluded.score, comment = excluded.comment, updated_at = now();
 end $$;
 
+-- v21: envío genérico por Brevo (registro en email_log; nunca lanza error)
+create or replace function public.brevo_send(p_to text, p_name text, p_subject text, p_html text, p_status text, p_request uuid default null)
+returns boolean language plpgsql security definer set search_path = public as $$
+declare s public.settings; v_key text;
+begin
+  if coalesce(p_to,'') = '' then return false; end if;
+  select * into s from public.settings where id = 1;
+  select decrypted_secret into v_key from vault.decrypted_secrets where name = 'brevo_api_key' limit 1;
+  if v_key is null then
+    insert into public.email_log (request_id, status, to_email, subject, queued, error) values (p_request, p_status, p_to, p_subject, false, 'Falta la API key de Brevo en Vault');
+    return false;
+  end if;
+  perform net.http_post(
+    url := 'https://api.brevo.com/v3/smtp/email',
+    headers := jsonb_build_object('api-key', v_key, 'content-type', 'application/json', 'accept', 'application/json'),
+    body := jsonb_build_object(
+      'sender', jsonb_build_object('name', 'Sitisbooks', 'email', s.mail_from),
+      'to', jsonb_build_array(jsonb_build_object('email', p_to, 'name', coalesce(nullif(trim(p_name),''), p_to))),
+      'subject', p_subject, 'htmlContent', p_html));
+  insert into public.email_log (request_id, status, to_email, subject, queued) values (p_request, p_status, p_to, p_subject, true);
+  return true;
+exception when others then
+  insert into public.email_log (request_id, status, to_email, subject, queued, error) values (p_request, p_status, p_to, p_subject, false, left(sqlerrm, 300));
+  return false;
+end $$;
+
+-- Plantilla de correo de la marca
+create or replace function public.mail_layout(p_title text, p_greeting text, p_body text, p_cta_text text, p_cta_url text, p_footer text)
+returns text language sql immutable as $$
+  select '<div style="font-family:Arial,Helvetica,sans-serif;background:#F7F9FC;padding:24px">'
+    || '<div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #E3E8F0;border-radius:12px;padding:28px">'
+    || '<p style="margin:0 0 16px;font-size:20px;font-weight:bold;color:#16213A">Sitisbooks</p>'
+    || '<h1 style="margin:0 0 12px;font-size:22px;color:#16213A">' || p_title || '</h1>'
+    || coalesce('<p style="margin:0 0 8px;font-size:15px;line-height:1.55;color:#3B4A66">' || p_greeting || '</p>', '')
+    || '<div style="margin:0 0 20px;font-size:15px;line-height:1.55;color:#3B4A66">' || p_body || '</div>'
+    || coalesce('<a href="' || p_cta_url || '" style="display:inline-block;background:#2F6BDB;color:#fff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:10px">' || p_cta_text || '</a>', '')
+    || coalesce('<p style="margin:24px 0 0;font-size:12px;color:#5B6478">' || p_footer || '</p>', '')
+    || '</div></div>'
+$$;
+
+-- v21: avisos de lista de deseos
+alter table public.wishes add column if not exists notified_at timestamptz;
+
+create or replace function public.send_wish_alerts(p_book uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare b public.books; s public.settings; k text; w record; v_html text; v_subject text;
+begin
+  select * into b from public.books where id = p_book and status = 'disponible';
+  if b.id is null then return; end if;
+  select * into s from public.settings where id = 1;
+  k := public.book_key(b.title, b.author);
+  for w in
+    select wi.id, p.email, p.first_name, p.last_name
+    from public.wishes wi join public.profiles p on p.id = wi.user_id
+    where wi.book_key = k and wi.user_id <> b.owner_id and p.banned_at is null
+      and (wi.notified_at is null or wi.notified_at < now() - interval '7 days')
+      -- quien ya tiene un pedido en curso de este libro no necesita el aviso
+      and not exists (select 1 from public.requests r join public.books b2 on b2.id = r.book_id
+                      where r.requester_id = wi.user_id and r.status not in ('entregado','cancelado')
+                        and public.book_key(b2.title, b2.author) = k)
+  loop
+    v_subject := '¡Llegó el libro que buscabas: ' || b.title || '!';
+    v_html := public.mail_layout(
+      '¡Llegó el libro que buscabas!',
+      'Hola ' || public.html_esc(initcap(trim(coalesce(w.first_name,'') || ' ' || coalesce(w.last_name,'')))) || ',',
+      coalesce('<img src="' || public.html_esc(b.cover_url) || '" alt="" width="96" style="display:block;width:96px;border-radius:6px;margin:0 0 14px">', '')
+        || 'Alguien acaba de publicar <b>' || public.html_esc(b.title) || '</b> de ' || public.html_esc(b.author)
+        || ', que está en tu lista de deseos. Está en estado <b>' || public.html_esc(lower(b.condition)) || '</b>.'
+        || '<br><br>Pídelo pronto: si otro lector lo pide primero, se reserva para él.',
+      'Pedir este libro', s.site_url || '/pedir/' || b.id,
+      'Recibes este aviso porque agregaste este libro a tu lista de deseos en Sitisbooks.');
+    if public.brevo_send(w.email, trim(coalesce(w.first_name,'') || ' ' || coalesce(w.last_name,'')), v_subject, v_html, 'deseo') then
+      update public.wishes set notified_at = now() where id = w.id;
+    end if;
+  end loop;
+end $$;
+
+-- v21: referidos
+alter table public.profiles add column if not exists referral_code text;
+alter table public.profiles add column if not exists referred_by uuid references public.profiles(id) on delete set null;
+alter table public.profiles add column if not exists referral_rewarded_at timestamptz;
+
+create or replace function public.gen_referral_code() returns text
+language plpgsql volatile set search_path = public as $$
+declare c text; abc constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+begin
+  loop
+    select string_agg(substr(abc, 1 + floor(random() * length(abc))::int, 1), '') into c from generate_series(1, 6);
+    exit when not exists (select 1 from public.profiles where referral_code = c);
+  end loop;
+  return c;
+end $$;
+
+do $$ declare r record; begin
+  for r in select id from public.profiles where referral_code is null loop
+    update public.profiles set referral_code = public.gen_referral_code() where id = r.id;
+  end loop;
+end $$;
+create unique index if not exists profiles_referral_code_key on public.profiles(referral_code);
+
+create or replace function public.set_referral_code() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  if new.referral_code is null then new.referral_code := public.gen_referral_code(); end if;
+  return new;
+end $$;
+drop trigger if exists profiles_referral_code on public.profiles;
+create trigger profiles_referral_code before insert on public.profiles
+  for each row execute function public.set_referral_code();
+
+-- El invitado registra el código de quien lo invitó (solo cuentas nuevas, una vez)
+create or replace function public.claim_referral(p_code text) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare me public.profiles; v_ref uuid;
+begin
+  select * into me from public.profiles where id = auth.uid();
+  if me.id is null or me.referred_by is not null or me.created_at < now() - interval '7 days' then return false; end if;
+  select id into v_ref from public.profiles where referral_code = upper(trim(coalesce(p_code,''))) and id <> me.id and banned_at is null;
+  if v_ref is null then return false; end if;
+  update public.profiles set referred_by = v_ref where id = me.id and referred_by is null;
+  return true;
+end $$;
+
+-- 1 crédito para el invitado y para quien lo invitó, una sola vez
+create or replace function public.reward_referral(p_user uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_ref uuid; s public.settings; ref public.profiles; inv public.profiles;
+begin
+  update public.profiles set referral_rewarded_at = now(), credits = credits + 1
+   where id = p_user and referred_by is not null and referral_rewarded_at is null
+   returning referred_by into v_ref;
+  if v_ref is null then return; end if;
+  update public.profiles set credits = credits + 1 where id = v_ref and banned_at is null;
+  select * into s from public.settings where id = 1;
+  select * into ref from public.profiles where id = v_ref;
+  select * into inv from public.profiles where id = p_user;
+  perform public.brevo_send(ref.email, ref.first_name, 'Ganaste 1 crédito por invitar a ' || initcap(coalesce(inv.first_name,'un amigo')),
+    public.mail_layout('¡Ganaste 1 crédito!', 'Hola ' || public.html_esc(initcap(coalesce(ref.first_name,''))) || ',',
+      public.html_esc(initcap(coalesce(inv.first_name,'Tu invitado'))) || ' donó su primer libro en Sitisbooks y ya llegó a su nuevo lector. Por haberlo invitado, sumamos <b>1 crédito</b> a tu cuenta para que pidas el libro que quieras.',
+      'Ver el catálogo', s.site_url || '/#catalogo', 'Sigue invitando: ganas 1 crédito por cada amigo que done su primer libro.'),
+    'referido');
+end $$;
+
+create or replace function public.my_referrals() returns table (code text, invited int, rewarded int)
+language sql stable security definer set search_path = public as $$
+  select (select referral_code from public.profiles where id = auth.uid()),
+         (select count(*)::int from public.profiles where referred_by = auth.uid()),
+         (select count(*)::int from public.profiles where referred_by = auth.uid() and referral_rewarded_at is not null)
+$$;
+
+revoke execute on function public.brevo_send(text, text, text, text, text, uuid) from public, anon, authenticated;
+revoke execute on function public.send_wish_alerts(uuid) from public, anon, authenticated;
+revoke execute on function public.reward_referral(uuid) from public, anon, authenticated;
+
 -- ---------- Storage ----------
 insert into storage.buckets (id, name, public) values ('comprobantes','comprobantes', false) on conflict (id) do nothing;
 insert into storage.buckets (id, name, public) values ('portadas','portadas', true) on conflict (id) do nothing;
@@ -958,7 +1116,7 @@ grant execute on function public.save_profile, public.publish_book, public.withd
   public.submit_payment, public.cancel_my_request, public.admin_review_payment, public.admin_update_request,
   public.admin_set_credits, public.update_contact, public.save_address, public.delete_address,
   public.buy_credits, public.admin_review_credit_purchase, public.quote_delivery,
-  public.accept_terms, public.admin_set_ban, public.set_avatar, public.add_wish, public.remove_wish, public.submit_nps to authenticated;
+  public.accept_terms, public.admin_set_ban, public.set_avatar, public.add_wish, public.remove_wish, public.submit_nps, public.claim_referral, public.my_referrals to authenticated;
 
 -- ---------- Permisos de tablas (proyectos Supabase desde mayo 2026 no exponen tablas por defecto) ----------
 -- RLS sigue limitando qué filas ve cada usuario.

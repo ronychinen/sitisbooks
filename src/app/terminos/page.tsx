@@ -46,7 +46,8 @@ export default function Page() {
 
       <section><h2 id="creditos">3. Créditos</h2>
         <ol>
-          <li>Un crédito permite pedir un libro. Se obtiene (a) al registrarte, como crédito de bienvenida, (b) cuando un libro que donaste es entregado a su nuevo lector, o (c) comprándolo, cuando esta opción esté disponible.</li>
+          <li>Un crédito permite pedir un libro. Se obtiene (a) al registrarte, como crédito de bienvenida, (b) cuando un libro que donaste es entregado a su nuevo lector, (c) comprándolo, cuando esta opción esté disponible, o (d) por el programa de referidos.</li>
+          <li>Programa de referidos: si una persona se registra desde tu enlace de invitación y su primer libro donado es entregado a su nuevo lector, ambos reciben 1 crédito, una sola vez por persona invitada. Invitarte a ti mismo, crear cuentas falsas o cualquier otro uso indebido anula los créditos obtenidos y puede causar la suspensión de la cuenta. Sitisbooks puede modificar o terminar este programa en cualquier momento, respetando los créditos ya ganados.</li>
           <li>Los créditos no son dinero ni medio de pago, no generan intereses y no pueden canjearse por efectivo ni transferirse a otras cuentas.</li>
           <li>El crédito por donar se acredita solo cuando el libro llega a su destinatario, no al publicarlo.</li>
           <li>Los créditos comprados se acreditan cuando Sitisbooks valida el pago. No son reembolsables una vez acreditados, salvo error atribuible a Sitisbooks o lo que disponga la normativa de protección al consumidor.</li>

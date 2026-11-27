@@ -281,3 +281,7 @@ tfoot th,tfoot td{border-bottom:0;border-top:2px solid var(--line);background:va
 .rm-cover{width:92px;flex:none}
 .rm-text{font-size:15px;line-height:1.6;color:#3B4A66;max-height:45vh;overflow:auto;padding-right:4px}
 .rm-text p{margin:0 0 10px}
+.btn.wa{background:#25D366;border-color:#25D366;color:#fff;display:inline-flex;align-items:center;gap:8px}
+.btn.wa:hover{background:#1EBE5A;border-color:#1EBE5A}
+.invite-link{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border:1px dashed #B9C9E6;border-radius:10px;background:var(--bg);font-family:var(--f-mono,monospace);font-size:14px;overflow-wrap:anywhere}
+.rm-share{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--line)}

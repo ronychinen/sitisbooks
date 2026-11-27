@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED = ["/donar", "/mis-intercambios", "/perfil", "/pedir", "/admin", "/creditos"];
+const PROTECTED = ["/donar", "/mis-intercambios", "/perfil", "/pedir", "/admin", "/creditos", "/invitar", "/encuesta"];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -22,6 +22,11 @@ export async function middleware(request: NextRequest) {
     }
   );
   const { data: { user } } = await supabase.auth.getUser();
+  // Referidos: guarda el código del enlace de invitación (30 días; el primero gana)
+  const ref = request.nextUrl.searchParams.get("ref")?.trim().toUpperCase();
+  if (ref && /^[A-Z0-9]{6}$/.test(ref) && !request.cookies.get("sb_ref")) {
+    response.cookies.set("sb_ref", ref, { maxAge: 60 * 60 * 24 * 30, path: "/", sameSite: "lax" });
+  }
   const path = request.nextUrl.pathname;
   if (!user && PROTECTED.some((p) => path.startsWith(p))) {
     const url = request.nextUrl.clone();

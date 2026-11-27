@@ -5,12 +5,14 @@ import { createClient } from "@/lib/supabase/client";
 import { CONDITIONS, GENRES, contactViolation } from "@/lib/constants";
 import BookCover from "@/components/BookCover";
 import AddressSelect from "@/components/AddressSelect";
+import ShareButtons from "@/components/ShareButtons";
+import { bookKey, bookShareUrl } from "@/lib/share";
 import type { Address } from "@/lib/constants";
 
 type Candidate = { url: string; source: string; title: string; author: string; year?: string };
 type CoverChoice = { kind: "none" } | { kind: "url"; url: string } | { kind: "upload"; url: string };
 
-export default function DonateForm({ addresses, initial }: { addresses: Address[]; initial?: { title: string; author: string; cover: string | null } }) {
+export default function DonateForm({ addresses, initial, refCode = null }: { addresses: Address[]; initial?: { title: string; author: string; cover: string | null }; refCode?: string | null }) {
   const supabase = createClient();
   const router = useRouter();
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -27,6 +29,7 @@ export default function DonateForm({ addresses, initial }: { addresses: Address[
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
+  const [doneKey, setDoneKey] = useState("");
   // Reseña: se busca sola al confirmar la portada; el usuario puede editarla
   const [summary, setSummary] = useState("");
   const [summaryState, setSummaryState] = useState<"idle" | "loading" | "found" | "none">("idle");
@@ -154,7 +157,7 @@ export default function DonateForm({ addresses, initial }: { addresses: Address[
     if (error?.code === "PGRST202") ({ error } = await supabase.rpc("publish_book", base)); // base de datos aún sin actualizar
     setBusy(false);
     if (error) { setError(error.message || "No pudimos publicar el libro. Inténtalo de nuevo."); return; }
-    setDone(title);
+    setDone(title); setDoneKey(bookKey(title, author));
     setTitle(""); setAuthor(""); setGenre(""); setCondition("");
     setCandidates(null); setPicked(null); setCover(null); lastQuery.current = "";
     setSummary(""); setSummaryState("idle"); summaryEdited.current = false; summaryFor.current = "";
@@ -166,7 +169,12 @@ export default function DonateForm({ addresses, initial }: { addresses: Address[
 
   return (
     <form className="stack" onSubmit={submit}>
-      {done && <p className="note">Publicaste “{done}”. Ya aparece en el catálogo.</p>}
+      {done && (
+        <div className="note stack" style={{ gap: 10 }}>
+          <span>Publicaste “{done}”. Ya aparece en el catálogo. Compártelo para que encuentre lector más rápido:</span>
+          <ShareButtons small url={bookShareUrl(doneKey, refCode)} text={`Acabo de donar "${done}" en Sitisbooks 📚 Si te interesa, pídelo aquí:`} />
+        </div>
+      )}
       <div className="grid2">
         <label className="ac">Título<input id="title" required maxLength={160} autoComplete="off" role="combobox" aria-expanded={sugOpen && sugs.length > 0} aria-controls="title-sugs" aria-invalid={!!titleErr} value={title}
             onChange={(e) => { typedTitle.current = true; setTitle(e.target.value); setDone(""); }}

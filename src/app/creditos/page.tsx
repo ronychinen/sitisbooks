@@ -22,7 +22,7 @@ export default async function Page() {
       <div>
         <p className="eyebrow">Tienes {profile.credits} {profile.credits === 1 ? "crédito" : "créditos"}</p>
         <h2>Comprar créditos</h2>
-        <p className="muted" style={{ marginTop: 6 }}>Cada crédito te permite pedir 1 libro. También puedes ganarlos gratis <Link href="/donar">donando libros</Link>.</p>
+        <p className="muted" style={{ marginTop: 6 }}>Cada crédito te permite pedir 1 libro. También puedes ganarlos gratis <Link href="/donar">donando libros</Link> o <Link href="/invitar">invitando a tus amigos</Link>.</p>
       </div>
       {price == null ? (
         <div className="empty"><p>La compra de créditos estará disponible muy pronto.</p><Link className="btn" href="/donar">Donar un libro</Link></div>

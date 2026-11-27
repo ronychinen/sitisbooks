@@ -4,11 +4,12 @@ import Link from "next/link";
 import BookCover from "./BookCover";
 import GenreTag from "./GenreTag";
 import { isSpanish } from "@/lib/lang";
+import ShareButtons from "./ShareButtons";
 
-type Props = { title: string; author: string; url: string | null; tag?: string; genre?: string; description?: string | null; requestHref?: string | null };
+type Props = { title: string; author: string; url: string | null; tag?: string; genre?: string; description?: string | null; requestHref?: string | null; shareUrl?: string; autoOpen?: boolean; hideTrigger?: boolean };
 
 /** Portada clicable del catálogo: abre un modal con la reseña del libro. */
-export default function ReviewCover({ title, author, url, tag, genre, description, requestHref }: Props) {
+export default function ReviewCover({ title, author, url, tag, genre, description, requestHref, shareUrl, autoOpen = false, hideTrigger = false }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   // Reseñas guardadas en otro idioma se reemplazan por la versión en español
   const [text, setText] = useState<string | null>(description && isSpanish(description) ? description : null);
@@ -25,6 +26,9 @@ export default function ReviewCover({ title, author, url, tag, genre, descriptio
       .catch(() => setState("none"));
   }
 
+  // Enlace compartido (/?libro=…): abre la reseña al cargar
+  useEffect(() => { if (autoOpen) open(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
@@ -35,13 +39,13 @@ export default function ReviewCover({ title, author, url, tag, genre, descriptio
 
   return (
     <>
-      <button type="button" className="cover-btn" onClick={open} aria-label={`Leer la reseña de ${title}`}>
+      {!hideTrigger && <button type="button" className="cover-btn" onClick={open} aria-label={`Leer la reseña de ${title}`}>
         <BookCover title={title} author={author} url={url} tag={tag} />
         <span className="cover-hint" aria-hidden="true">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M2 5h7a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H2z" /><path d="M22 5h-7a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h8z" /></svg>
           Toca para leer la reseña
         </span>
-      </button>
+      </button>}
       <dialog ref={ref} className="review-modal" aria-label={`Reseña de ${title}`}>
         <div className="rm-body">
           <button type="button" className="rm-close" onClick={() => ref.current?.close()} aria-label="Cerrar">×</button>
@@ -58,6 +62,12 @@ export default function ReviewCover({ title, author, url, tag, genre, descriptio
               : state === "loading" ? <p className="muted">Buscando la reseña…</p>
               : <p className="muted">Aún no tenemos una reseña de este libro.</p>}
           </div>
+          {shareUrl && (
+            <div className="rm-share">
+              <span className="muted" style={{ fontSize: 13 }}>¿Conoces a alguien a quien le gustaría?</span>
+              <ShareButtons small url={shareUrl} label="Compartir" text={`Mira "${title}" de ${author} en Sitisbooks, la comunidad para intercambiar libros en Lima 📚`} />
+            </div>
+          )}
           <div className="row" style={{ justifyContent: "flex-end" }}>
             <button type="button" className="btn ghost" onClick={() => ref.current?.close()}>Cerrar</button>
             {requestHref ? <Link className="btn" href={requestHref}>Pedir este libro</Link> : <span className="chip s-disponible">Tu libro</span>}

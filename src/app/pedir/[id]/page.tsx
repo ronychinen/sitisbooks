@@ -4,6 +4,8 @@ import BookCover from "@/components/BookCover";
 import GenreTag from "@/components/GenreTag";
 import { CONDITION_RANK, copiesLabel, type CatalogBook, type Settings } from "@/lib/constants";
 import RequestPanel from "./RequestPanel";
+import ShareButtons from "@/components/ShareButtons";
+import { bookShareUrl } from "@/lib/share";
 
 export const metadata = { title: "Pedir libro", robots: { index: false, follow: false } };
 
@@ -51,8 +53,10 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         <p className="note">Pagas por Yape o transferencia en el siguiente paso. Reservamos el libro para ti mientras subes tu comprobante. Sitisbooks coordina el recojo y la entrega; no compartimos tus datos con el donante.</p>
         {own ? <p className="error">Este libro es tuyo.</p>
           : unavailable ? <p className="error">Este libro ya no está disponible.</p>
-          : noCredits ? <div className="stack"><p className="error">No tienes créditos. Compra uno o dona un libro para ganarlo gratis.</p><div className="row"><Link className="btn" href="/creditos">Comprar créditos</Link><Link className="btn ghost" href="/donar">Donar un libro</Link></div></div>
+          : noCredits ? <div className="stack"><p className="error">No tienes créditos. Compra uno, dona un libro o <Link href="/invitar">invita a un amigo</Link> para ganarlo.</p><div className="row"><Link className="btn" href="/creditos">Comprar créditos</Link><Link className="btn ghost" href="/donar">Donar un libro</Link></div></div>
           : null}
+        <ShareButtons small url={bookShareUrl(b.book_key, profile.referral_code)} label="Compartir este libro"
+          text={`Mira "${b.title}" de ${b.author} en Sitisbooks, la comunidad para intercambiar libros en Lima 📚`} />
       </section>
     </div>
   );

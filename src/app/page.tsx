@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
 import ReviewCover from "@/components/ReviewCover";
+import { bookShareUrl } from "@/lib/share";
 import GenreTag from "@/components/GenreTag";
 import SmoothLink from "@/components/SmoothLink";
 import CatalogFilters from "./CatalogFilters";
@@ -18,9 +19,10 @@ const jsonLd = {
 
 export const dynamic = "force-dynamic";
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ q?: string; g?: string }> }) {
-  const { q = "", g = "" } = await searchParams;
-  const { supabase, user } = await getSession();
+export default async function Home({ searchParams }: { searchParams: Promise<{ q?: string; g?: string; libro?: string }> }) {
+  const { q = "", g = "", libro = "" } = await searchParams;
+  const { supabase, user, profile } = await getSession();
+  const myRef = profile?.referral_code ?? null;
   let query = supabase.from("catalog_groups").select("*").order("created_at", { ascending: false }).limit(120);
   if (g) query = query.eq("genre", g);
   if (q) {
@@ -28,10 +30,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
     const norm = q.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9ñ]+/g, " ").trim();
     if (norm) for (const w of norm.split(" ").slice(0, 6)) query = query.ilike("book_key", `%${w}%`);
   }
-  const [{ data }, { data: last }] = await Promise.all([
+  const [{ data }, { data: last }, { data: sharedData }] = await Promise.all([
     query,
     supabase.from("catalog_groups").select("*").order("created_at", { ascending: false }).limit(3),
+    libro ? supabase.from("catalog_groups").select("*").eq("book_key", libro.slice(0, 300)).maybeSingle() : Promise.resolve({ data: null }),
   ]);
+  const shared = sharedData as CatalogGroup | null;
   const latest = (last ?? []) as CatalogGroup[];
   const books = (data ?? []) as CatalogGroup[];
   const filtered = !!(q || g);
@@ -39,6 +43,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      {shared && (
+        <ReviewCover autoOpen hideTrigger title={shared.title} author={shared.author} url={shared.cover_url} genre={shared.genre} description={shared.description}
+          requestHref={shared.request_id ? (user ? `/pedir/${shared.request_id}` : `/ingresar?next=${encodeURIComponent(`/pedir/${shared.request_id}`)}`) : null}
+          shareUrl={bookShareUrl(shared.book_key, myRef)} />
+      )}
       <section className="lp-hero">
         <div className="lp-copy">
           <span className="lp-badge"><i aria-hidden="true" />Intercambio de libros en Lima</span>
@@ -107,7 +116,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
         <div className="shelf">
           {books.map((b) => (
             <article className="book" key={b.book_key}>
-              <ReviewCover title={b.title} author={b.author} url={b.cover_url} tag={b.condition} genre={b.genre} description={b.description} requestHref={b.request_id ? `/pedir/${b.request_id}` : null} />
+              <ReviewCover title={b.title} author={b.author} url={b.cover_url} tag={b.condition} genre={b.genre} description={b.description} requestHref={b.request_id ? `/pedir/${b.request_id}` : null} shareUrl={bookShareUrl(b.book_key, myRef)} />
               <div className="title" title={b.title}>{b.title}</div>
               <div className="author" title={b.author}>{b.author}</div>
               <div className="row" style={{ gap: 6 }}><GenreTag genre={b.genre} /><span className="copies">{copiesLabel(b.copies)}</span></div>

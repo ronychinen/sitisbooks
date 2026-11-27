@@ -2,10 +2,10 @@
 import { useState } from "react";
 
 /** Copia un valor al portapapeles (sin guiones ni espacios) y confirma con "Copiado". */
-export default function CopyButton({ value, label }: { value: string; label: string }) {
+export default function CopyButton({ value, label, raw = false, text = "Copiar" }: { value: string; label: string; raw?: boolean; text?: string }) {
   const [ok, setOk] = useState(false);
   async function copy() {
-    const v = value.replace(/[\s-]/g, "");
+    const v = raw ? value : value.replace(/[\s-]/g, "");
     try { await navigator.clipboard.writeText(v); }
     catch {
       const t = document.createElement("textarea"); t.value = v; t.setAttribute("readonly", "");
@@ -16,7 +16,7 @@ export default function CopyButton({ value, label }: { value: string; label: str
   }
   return (
     <button type="button" className="copy" onClick={copy} aria-label={`Copiar ${label}`} aria-live="polite">
-      {ok ? "✓ Copiado" : "Copiar"}
+      {ok ? "✓ Copiado" : text}
     </button>
   );
 }
