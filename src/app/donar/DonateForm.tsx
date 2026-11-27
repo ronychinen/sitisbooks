@@ -39,7 +39,7 @@ export default function DonateForm({ addresses, initial }: { addresses: Address[
     summaryFor.current = key;
     setSummaryState("loading");
     const ctrl = new AbortController();
-    fetch(`/api/summary?title=${encodeURIComponent(title.trim())}&author=${encodeURIComponent(author.trim())}`, { signal: ctrl.signal })
+    fetch(`/api/summary?v=2&title=${encodeURIComponent(title.trim())}&author=${encodeURIComponent(author.trim())}`, { signal: ctrl.signal })
       .then((r) => r.json())
       .then((j: { summary: string | null }) => {
         if (summaryEdited.current) return;

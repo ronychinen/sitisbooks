@@ -19,7 +19,7 @@ export default function ReviewCover({ title, author, url, tag, genre, descriptio
     if (text || state !== "idle") return;
     // Libros publicados sin reseña: la buscamos al abrir
     setState("loading");
-    fetch(`/api/summary?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}`)
+    fetch(`/api/summary?v=2&title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}`)
       .then((r) => r.json())
       .then((j: { summary: string | null }) => { if (j.summary) { setText(j.summary); setState("idle"); } else setState("none"); })
       .catch(() => setState("none"));
