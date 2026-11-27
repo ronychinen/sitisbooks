@@ -24,7 +24,11 @@ export default function PaymentForm({ requestId, total }: { requestId: string; t
     const path = `${user!.id}/${requestId}-${Date.now()}.${ext}`;
     const up = await supabase.storage.from("comprobantes").upload(path, file, { contentType: file.type });
     if (up.error) { setBusy(false); setError("No pudimos subir el comprobante. Inténtalo de nuevo."); return; }
-    const { error } = await supabase.rpc("submit_payment", { p_request: requestId, p_method: null, p_operation: null, p_proof: path });
+    // Enlace temporal (7 días) para adjuntar el comprobante en el aviso al admin
+    const signed = await supabase.storage.from("comprobantes").createSignedUrl(path, 7 * 24 * 3600);
+    const base = { p_request: requestId, p_method: null, p_operation: null, p_proof: path };
+    let { error } = await supabase.rpc("submit_payment", { ...base, p_proof_url: signed.data?.signedUrl ?? null });
+    if (error?.code === "PGRST202") ({ error } = await supabase.rpc("submit_payment", base)); // base de datos aún sin actualizar
     setBusy(false);
     if (error) { setError(error.message); return; }
     router.refresh();

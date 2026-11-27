@@ -505,13 +505,17 @@ begin
   return v_id;
 end $$;
 
-create or replace function public.submit_payment(p_request uuid, p_method text, p_operation text, p_proof text)
+drop function if exists public.submit_payment(uuid, text, text, text);
+-- p_proof_url: enlace firmado temporal del comprobante, para adjuntarlo en el aviso al admin
+create or replace function public.submit_payment(p_request uuid, p_method text, p_operation text, p_proof text, p_proof_url text default null)
 returns void language plpgsql security definer set search_path = public as $$
 begin
   update public.requests set payment_method = p_method, operation_code = nullif(trim(p_operation),''),
     proof_path = p_proof, payment_note = null, status = 'pago_en_revision'
   where id = p_request and requester_id = auth.uid() and status = 'pendiente_pago';
   if not found then raise exception 'Este pedido no está esperando pago'; end if;
+  if p_proof_url is not null and p_proof_url !~ '^https://' then p_proof_url := null; end if;
+  perform public.send_admin_new_request(p_request, p_proof_url, p_proof);
 end $$;
 
 create or replace function public.cancel_my_request(p_request uuid) returns void
@@ -788,12 +792,15 @@ drop trigger if exists request_status_email on public.requests;
 create trigger request_status_email after update of status on public.requests
   for each row execute function public.on_request_status_change();
 
--- v18: aviso al admin cuando alguien pide un libro
+-- v18: aviso al admin cuando alguien paga un pedido (con el comprobante adjunto)
 alter table public.settings add column if not exists admin_email text not null default 'ronychinen@gmail.com';
+drop trigger if exists request_created_admin_email on public.requests;
+drop function if exists public.on_request_created();
+drop function if exists public.send_admin_new_request(uuid);
 
-create or replace function public.send_admin_new_request(p_request uuid) returns void
+create or replace function public.send_admin_new_request(p_request uuid, p_proof_url text default null, p_proof_path text default null) returns void
 language plpgsql security definer set search_path = public as $$
-declare r public.requests; q public.profiles; d public.profiles; s public.settings; v_key text; v_subject text; v_html text;
+declare r public.requests; q public.profiles; d public.profiles; s public.settings; v_key text; v_subject text; v_html text; v_body jsonb; v_ext text;
   v_row text := '<tr><td style="padding:6px 12px 6px 0;color:#5B6478;vertical-align:top;white-space:nowrap">%s</td><td style="padding:6px 0;color:#16213A">%s</td></tr>';
 begin
   select * into r from public.requests where id = p_request;
@@ -802,49 +809,47 @@ begin
   if coalesce(s.admin_email,'') = '' then return; end if;
   select * into q from public.profiles where id = r.requester_id;
   select * into d from public.profiles where id = r.donor_id;
-  v_subject := 'Nuevo pedido: ' || r.book_title || ' — ' || initcap(trim(coalesce(q.first_name,'') || ' ' || coalesce(q.last_name,'')));
+  v_subject := 'Pago recibido: ' || r.book_title || ' — ' || initcap(trim(coalesce(q.first_name,'') || ' ' || coalesce(q.last_name,'')));
   v_html := '<div style="font-family:Arial,Helvetica,sans-serif;background:#F7F9FC;padding:24px">'
     || '<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E3E8F0;border-radius:12px;padding:28px">'
     || '<p style="margin:0 0 16px;font-size:20px;font-weight:bold;color:#16213A">Sitisbooks · Admin</p>'
-    || '<h1 style="margin:0 0 16px;font-size:22px;color:#16213A">Nuevo pedido de libro</h1>'
+    || '<h1 style="margin:0 0 16px;font-size:22px;color:#16213A">Nuevo pedido pagado</h1>'
     || '<table style="border-collapse:collapse;font-size:15px;line-height:1.45">'
     || format(v_row, 'Libro', '<b>' || public.html_esc(r.book_title) || '</b>')
     || format(v_row, 'Pide', public.html_esc(initcap(trim(coalesce(q.first_name,'') || ' ' || coalesce(q.last_name,'')))) || '<br>' || coalesce(public.html_esc(q.phone),'') || ' · ' || coalesce(public.html_esc(q.email),'') || '<br>' || coalesce(public.html_esc(r.delivery_address), public.html_esc(r.to_district), ''))
     || format(v_row, 'Dona', public.html_esc(initcap(trim(coalesce(d.first_name,'') || ' ' || coalesce(d.last_name,'')))) || '<br>' || coalesce(public.html_esc(d.phone),'') || ' · ' || coalesce(public.html_esc(d.email),'') || '<br>' || coalesce(public.html_esc(r.pickup_address), public.html_esc(r.from_district), ''))
-    || format(v_row, 'Total', 'S/ ' || to_char(r.total, 'FM999990.00') || ' (delivery S/ ' || to_char(r.delivery_fee, 'FM999990.00') || ' + comisión S/ ' || to_char(r.platform_fee, 'FM999990.00') || ')')
-    || format(v_row, 'Fecha', public.fmt_lima(r.created_at))
+    || format(v_row, 'Pagó', '<b>S/ ' || to_char(r.total, 'FM999990.00') || '</b> (delivery S/ ' || to_char(r.delivery_fee, 'FM999990.00') || ' + comisión S/ ' || to_char(r.platform_fee, 'FM999990.00') || ')')
+    || format(v_row, 'Pedido', public.fmt_lima(r.created_at))
     || '</table>'
-    || '<p style="margin:20px 0 0;font-size:14px;color:#3B4A66">Está pendiente de pago.</p>'
-    || '<a href="' || s.site_url || '/admin?st=pendiente_pago" style="display:inline-block;margin-top:16px;background:#2F6BDB;color:#fff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:10px">Abrir en el admin</a>'
+    || '<p style="margin:20px 0 0;font-size:14px;color:#3B4A66">'
+    || case when p_proof_url is not null then 'El comprobante va adjunto. También puedes <a href="' || p_proof_url || '" style="color:#2F6BDB">verlo aquí</a> (enlace válido 7 días).' else 'Revisa el comprobante en el admin.' end
+    || '</p>'
+    || '<a href="' || s.site_url || '/admin?st=pago_en_revision" style="display:inline-block;margin-top:16px;background:#2F6BDB;color:#fff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:10px">Validar en el admin</a>'
     || '</div></div>';
 
   select decrypted_secret into v_key from vault.decrypted_secrets where name = 'brevo_api_key' limit 1;
   if v_key is null then
-    insert into public.email_log (request_id, status, to_email, subject, queued, error) values (r.id, 'admin_nuevo', s.admin_email, v_subject, false, 'Falta la API key de Brevo en Vault');
+    insert into public.email_log (request_id, status, to_email, subject, queued, error) values (r.id, 'admin_pago', s.admin_email, v_subject, false, 'Falta la API key de Brevo en Vault');
     return;
+  end if;
+  v_body := jsonb_build_object(
+    'sender', jsonb_build_object('name', 'Sitisbooks', 'email', s.mail_from),
+    'to', jsonb_build_array(jsonb_build_object('email', s.admin_email)),
+    'subject', v_subject, 'htmlContent', v_html);
+  if p_proof_url is not null then
+    v_ext := lower(coalesce(substring(coalesce(p_proof_path,'') from '\.([A-Za-z0-9]+)$'), 'jpg'));
+    if v_ext not in ('jpg','jpeg','png','gif','pdf','webp','heic') then v_ext := 'jpg'; end if;
+    v_body := v_body || jsonb_build_object('attachment', jsonb_build_array(jsonb_build_object('url', p_proof_url, 'name', 'comprobante.' || v_ext)));
   end if;
   perform net.http_post(
     url := 'https://api.brevo.com/v3/smtp/email',
     headers := jsonb_build_object('api-key', v_key, 'content-type', 'application/json', 'accept', 'application/json'),
-    body := jsonb_build_object(
-      'sender', jsonb_build_object('name', 'Sitisbooks', 'email', s.mail_from),
-      'to', jsonb_build_array(jsonb_build_object('email', s.admin_email)),
-      'subject', v_subject, 'htmlContent', v_html));
-  insert into public.email_log (request_id, status, to_email, subject, queued) values (r.id, 'admin_nuevo', s.admin_email, v_subject, true);
+    body := v_body);
+  insert into public.email_log (request_id, status, to_email, subject, queued) values (r.id, 'admin_pago', s.admin_email, v_subject, true);
 exception when others then
-  insert into public.email_log (request_id, status, to_email, subject, queued, error) values (p_request, 'admin_nuevo', s.admin_email, v_subject, false, left(sqlerrm, 300));
+  insert into public.email_log (request_id, status, to_email, subject, queued, error) values (p_request, 'admin_pago', s.admin_email, v_subject, false, left(sqlerrm, 300));
 end $$;
-
-create or replace function public.on_request_created() returns trigger
-language plpgsql security definer set search_path = public as $$
-begin
-  perform public.send_admin_new_request(new.id);
-  return new;
-end $$;
-drop trigger if exists request_created_admin_email on public.requests;
-create trigger request_created_admin_email after insert on public.requests
-  for each row execute function public.on_request_created();
-revoke execute on function public.send_admin_new_request(uuid) from public, anon, authenticated;
+revoke execute on function public.send_admin_new_request(uuid, text, text) from public, anon, authenticated;
 revoke execute on function public.send_status_email(uuid) from public, anon, authenticated;
 
 -- ---------- Storage ----------
