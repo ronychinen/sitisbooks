@@ -41,7 +41,7 @@ export default async function Page() {
               <div className="addr" key={c.id}>
                 <div>
                   <b>{c.quantity} {c.quantity === 1 ? "crédito" : "créditos"} · {soles(c.total)}</b>
-                  <div className="muted" style={{ fontSize: 13 }}>{fmtDT(c.created_at)} · {c.payment_method === "yape" ? "Yape" : "Transferencia"}</div>
+                  <div className="muted" style={{ fontSize: 13 }}>{fmtDT(c.created_at)}{c.payment_method ? ` · ${c.payment_method === "yape" ? "Yape" : "Transferencia"}` : ""}</div>
                   {c.status === "rechazado" && c.admin_note && <div className="error" style={{ fontSize: 13 }}>Motivo: {c.admin_note}</div>}
                 </div>
                 <span className={`chip pc-${c.status}`}>{PURCHASE_LABEL[c.status]}</span>

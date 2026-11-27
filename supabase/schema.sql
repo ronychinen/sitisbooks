@@ -637,7 +637,7 @@ begin
   select credit_price into v_price from public.settings where id = 1;
   if v_price is null then raise exception 'La compra de créditos aún no está disponible'; end if;
   if p_quantity is null or p_quantity < 1 or p_quantity > 10 then raise exception 'Puedes comprar de 1 a 10 créditos'; end if;
-  if p_method not in ('yape','transferencia') then raise exception 'Elige Yape o transferencia'; end if;
+  if p_method is not null and p_method not in ('yape','transferencia') then raise exception 'Método de pago no válido'; end if;
   if coalesce(p_proof,'') = '' or split_part(p_proof, '/', 1) <> auth.uid()::text then raise exception 'Adjunta tu comprobante'; end if;
   if (select count(*) from public.credit_purchases where user_id = auth.uid() and status = 'pago_en_revision') >= 3 then
     raise exception 'Tienes compras en revisión. Espera a que las validemos';
@@ -809,6 +809,9 @@ create policy "subir avatar propio" on storage.objects for insert to authenticat
 drop policy if exists "borrar avatar propio" on storage.objects;
 create policy "borrar avatar propio" on storage.objects for delete to authenticated
   using (bucket_id = 'avatares' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- v16: el método de pago ya no se pide al usuario
+alter table public.credit_purchases alter column payment_method drop not null;
 
 -- v15: QR de Yape (imagen pública subida por el admin)
 alter table public.settings add column if not exists yape_qr_url text;

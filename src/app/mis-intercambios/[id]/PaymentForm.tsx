@@ -3,12 +3,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { soles } from "@/lib/constants";
+import FileDrop from "@/components/FileDrop";
 
 export default function PaymentForm({ requestId, total }: { requestId: string; total: number }) {
   const supabase = createClient();
   const router = useRouter();
-  const [method, setMethod] = useState<"yape" | "transferencia">("yape");
-  const [op, setOp] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -25,7 +24,7 @@ export default function PaymentForm({ requestId, total }: { requestId: string; t
     const path = `${user!.id}/${requestId}-${Date.now()}.${ext}`;
     const up = await supabase.storage.from("comprobantes").upload(path, file, { contentType: file.type });
     if (up.error) { setBusy(false); setError("No pudimos subir el comprobante. Inténtalo de nuevo."); return; }
-    const { error } = await supabase.rpc("submit_payment", { p_request: requestId, p_method: method, p_operation: op, p_proof: path });
+    const { error } = await supabase.rpc("submit_payment", { p_request: requestId, p_method: null, p_operation: null, p_proof: path });
     setBusy(false);
     if (error) { setError(error.message); return; }
     router.refresh();
@@ -33,14 +32,7 @@ export default function PaymentForm({ requestId, total }: { requestId: string; t
 
   return (
     <form className="stack" onSubmit={submit}>
-      <div className="subtabs" role="radiogroup" aria-label="Método de pago">
-        <button type="button" aria-pressed={method === "yape"} onClick={() => setMethod("yape")}>Yape</button>
-        <button type="button" aria-pressed={method === "transferencia"} onClick={() => setMethod("transferencia")}>Transferencia</button>
-      </div>
-      <div className="grid2">
-        <label>N.º de operación (opcional)<input id="op" maxLength={40} value={op} onChange={(e) => setOp(e.target.value)} /></label>
-        <label>Comprobante (imagen o PDF)<input id="proof" type="file" accept="image/*,application/pdf" required onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label>
-      </div>
+      <FileDrop file={file} onChange={(f) => { setFile(f); setError(""); }} />
       {error && <p className="error">{error}</p>}
       <button className="btn" disabled={busy}>{busy ? "Enviando…" : `Enviar comprobante de ${soles(total)}`}</button>
       {cancelAsk ? (

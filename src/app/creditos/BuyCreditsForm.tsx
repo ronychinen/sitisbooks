@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { soles } from "@/lib/constants";
+import FileDrop from "@/components/FileDrop";
 
 const PACKS = [1, 3, 5, 10];
 
@@ -10,8 +11,6 @@ export default function BuyCreditsForm({ price }: { price: number }) {
   const supabase = createClient();
   const router = useRouter();
   const [qty, setQty] = useState(1);
-  const [method, setMethod] = useState<"yape" | "transferencia">("yape");
-  const [op, setOp] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -29,10 +28,10 @@ export default function BuyCreditsForm({ price }: { price: number }) {
     const path = `${user!.id}/creditos-${Date.now()}.${ext}`;
     const up = await supabase.storage.from("comprobantes").upload(path, file, { contentType: file.type });
     if (up.error) { setBusy(false); setError("No pudimos subir el comprobante. Inténtalo de nuevo."); return; }
-    const { error } = await supabase.rpc("buy_credits", { p_quantity: qty, p_method: method, p_operation: op, p_proof: path });
+    const { error } = await supabase.rpc("buy_credits", { p_quantity: qty, p_method: null, p_operation: null, p_proof: path });
     setBusy(false);
     if (error) { setError(error.message); return; }
-    setDone(true); setOp(""); setFile(null);
+    setDone(true); setFile(null);
     router.refresh();
   }
 
@@ -59,14 +58,7 @@ export default function BuyCreditsForm({ price }: { price: number }) {
         <span>{qty} × {soles(price)}</span><span className="n">{soles(total)}</span>
         <span className="tot">Total a pagar</span><span className="n tot">{soles(total)}</span>
       </div>
-      <div className="subtabs" role="radiogroup" aria-label="Método de pago">
-        <button type="button" aria-pressed={method === "yape"} onClick={() => setMethod("yape")}>Yape</button>
-        <button type="button" aria-pressed={method === "transferencia"} onClick={() => setMethod("transferencia")}>Transferencia</button>
-      </div>
-      <div className="grid2">
-        <label>N.º de operación (opcional)<input maxLength={40} value={op} onChange={(e) => setOp(e.target.value)} /></label>
-        <label>Comprobante (imagen o PDF)<input type="file" accept="image/*,application/pdf" required onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></label>
-      </div>
+      <FileDrop file={file} onChange={(f) => { setFile(f); setError(""); }} />
       {error && <p className="error">{error}</p>}
       <button className="btn" disabled={busy}>{busy ? "Enviando…" : `Enviar comprobante de ${soles(total)}`}</button>
     </form>

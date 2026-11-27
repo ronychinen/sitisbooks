@@ -77,7 +77,7 @@ export default function AdminCard({ r, donor, requester, proofUrl }: { r: Reques
 
       {r.status === "pago_en_revision" && (
         <div className="full panel stack" style={{ padding: 14 }}>
-          <b>Validar pago de {soles(r.total)} · {r.payment_method === "yape" ? "Yape" : "Transferencia"}{r.operation_code ? ` · Op. ${r.operation_code}` : ""}</b>
+          <b>Validar pago de {soles(r.total)}{r.payment_method ? ` · ${r.payment_method === "yape" ? "Yape" : "Transferencia"}` : ""}{r.operation_code ? ` · Op. ${r.operation_code}` : ""}</b>
           {proofUrl ? (
             <div className="proof">
               {/* eslint-disable-next-line @next/next/no-img-element */}

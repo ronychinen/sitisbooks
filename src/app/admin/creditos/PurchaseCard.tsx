@@ -26,7 +26,7 @@ export default function PurchaseCard({ c, user, proofUrl }: { c: CreditPurchase;
       <div className="full row between" style={{ alignItems: "flex-start" }}>
         <div>
           <h3>{c.quantity} {c.quantity === 1 ? "crédito" : "créditos"} · {soles(c.total)}</h3>
-          <p className="muted" style={{ fontSize: 13 }}>{soles(c.unit_price)} c/u · {c.payment_method === "yape" ? "Yape" : "Transferencia"}{c.operation_code ? ` · Op. ${c.operation_code}` : ""} · {fmtDT(c.created_at)}</p>
+          <p className="muted" style={{ fontSize: 13 }}>{soles(c.unit_price)} c/u{c.payment_method ? ` · ${c.payment_method === "yape" ? "Yape" : "Transferencia"}` : ""}{c.operation_code ? ` · Op. ${c.operation_code}` : ""} · {fmtDT(c.created_at)}</p>
         </div>
         <span className={`chip pc-${c.status}`}>{PURCHASE_LABEL[c.status]}</span>
       </div>

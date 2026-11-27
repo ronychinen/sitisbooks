@@ -6,7 +6,6 @@ export const dynamic = "force-dynamic";
 
 // Pago aprobado por el admin: de "pagado" en adelante (los cancelados no cuentan).
 const PAID = ["pagado", "coordinando", "en_camino", "entregado"];
-const METHOD: Record<string, string> = { yape: "Yape", transferencia: "Transferencia" };
 const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const monthKey = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Lima" }).slice(0, 7);
 const monthLabel = (k: string) => `${MONTHS[Number(k.slice(5)) - 1]} ${k.slice(0, 4)}`;
@@ -60,15 +59,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
         {R.length === 0 ? <div className="empty"><p>No hay intercambios con pago aprobado{month ? " en este mes" : ""}.</p></div> : (
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Fecha</th><th>Libro</th><th>Solicitante</th><th>Método</th><th>N.º operación</th><th>Estado</th><th>Delivery</th><th>Comisión</th><th>Total</th></tr></thead>
+              <thead><tr><th>Fecha</th><th>Libro</th><th>Solicitante</th><th>Estado</th><th>Delivery</th><th>Comisión</th><th>Total</th></tr></thead>
               <tbody>
                 {R.map((r) => (
                   <tr key={r.id}>
                     <td>{fmtD(r.created_at)}</td>
                     <td className="wrapcell">{r.book_title}</td>
                     <td className="wrapcell">{name[r.requester_id] ?? "—"}</td>
-                    <td>{r.payment_method ? METHOD[r.payment_method] : "—"}</td>
-                    <td className="n">{r.operation_code || "—"}</td>
                     <td><span className={`chip s-${r.status}`}>{STATUS_LABEL[r.status]}</span></td>
                     <td className="n">{soles(r.delivery_fee)}</td>
                     <td className="n">{soles(r.platform_fee)}</td>
@@ -77,7 +74,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
                 ))}
               </tbody>
               <tfoot>
-                <tr><th colSpan={6}>Total</th><td className="n"><b>{soles(delivery)}</b></td><td className="n"><b>{soles(commission)}</b></td><td className="n"><b>{soles(exchanges)}</b></td></tr>
+                <tr><th colSpan={4}>Total</th><td className="n"><b>{soles(delivery)}</b></td><td className="n"><b>{soles(commission)}</b></td><td className="n"><b>{soles(exchanges)}</b></td></tr>
               </tfoot>
             </table>
           </div>
@@ -89,21 +86,19 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
         {P.length === 0 ? <div className="empty"><p>No hay compras de créditos aprobadas{month ? " en este mes" : ""}.</p></div> : (
           <div className="table-wrap">
             <table>
-              <thead><tr><th>Fecha</th><th>Usuario</th><th>Créditos</th><th>Método</th><th>N.º operación</th><th>Total</th></tr></thead>
+              <thead><tr><th>Fecha</th><th>Usuario</th><th>Créditos</th><th>Total</th></tr></thead>
               <tbody>
                 {P.map((p) => (
                   <tr key={p.id}>
                     <td>{fmtD(p.created_at)}</td>
                     <td className="wrapcell">{name[p.user_id] ?? "—"}</td>
                     <td className="n">{p.quantity}</td>
-                    <td>{METHOD[p.payment_method] ?? p.payment_method}</td>
-                    <td className="n">{p.operation_code || "—"}</td>
                     <td className="n"><b>{soles(p.total)}</b></td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr><th colSpan={5}>Total</th><td className="n"><b>{soles(credits)}</b></td></tr>
+                <tr><th colSpan={3}>Total</th><td className="n"><b>{soles(credits)}</b></td></tr>
               </tfoot>
             </table>
           </div>
