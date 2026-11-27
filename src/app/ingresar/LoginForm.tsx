@@ -8,7 +8,7 @@ import PasswordInput from "@/components/PasswordInput";
 type Mode = "login" | "signup" | "reset";
 
 // Se activa cuando Google esté configurado en Supabase (Authentication → Providers → Google)
-const GOOGLE_LOGIN = false;
+const GOOGLE_LOGIN = true;
 type Step = "form" | "code" | "password";
 
 export default function LoginForm() {
