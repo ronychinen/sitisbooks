@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Logo from "./Logo";
+import ActivityTracker from "./ActivityTracker";
 import { getSession } from "@/lib/supabase/server";
 import NavLinks from "./NavLinks";
 import Avatar from "./Avatar";
@@ -15,6 +16,7 @@ export default async function Header() {
   ];
   return (
     <header className="top">
+      {profile && <ActivityTracker />}
       <div className="wrap topbar">
         <Link href="/" className="logo"><Logo size={36} />Sitisbooks</Link>
         <NavLinks links={links}>

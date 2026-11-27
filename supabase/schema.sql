@@ -1066,6 +1066,37 @@ revoke execute on function public.brevo_send(text, text, text, text, text, uuid)
 revoke execute on function public.send_wish_alerts(uuid) from public, anon, authenticated;
 revoke execute on function public.reward_referral(uuid) from public, anon, authenticated;
 
+-- v22: actividad de usuarios con sesión (para el dashboard del admin)
+create table if not exists public.user_activity (
+  user_id        uuid not null references public.profiles(id) on delete cascade,
+  day            date not null,
+  first_seen     timestamptz not null default now(),
+  last_seen      timestamptz not null default now(),
+  active_seconds int  not null default 0,
+  pages          int  not null default 0,
+  primary key (user_id, day)
+);
+create index if not exists user_activity_day_idx on public.user_activity(day);
+alter table public.user_activity enable row level security;
+drop policy if exists "actividad solo admin" on public.user_activity;
+create policy "actividad solo admin" on public.user_activity for select to authenticated using (public.is_admin());
+grant select on public.user_activity to authenticated;
+
+-- La web informa cada minuto el tiempo activo (pestaña visible y con interacción). Se limita al tiempo real transcurrido.
+create or replace function public.track_activity(p_seconds int, p_page boolean default false) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_day date := (now() at time zone 'America/Lima')::date;
+begin
+  if auth.uid() is null or not exists (select 1 from public.profiles where id = auth.uid()) then return; end if;
+  insert into public.user_activity as a (user_id, day, active_seconds, pages)
+  values (auth.uid(), v_day, 0, case when p_page then 1 else 0 end)
+  on conflict (user_id, day) do update set
+    active_seconds = a.active_seconds + least(greatest(coalesce(p_seconds,0), 0), 90,
+                       greatest(0, ceil(extract(epoch from now() - a.last_seen))::int + 5)),
+    pages = a.pages + case when p_page then 1 else 0 end,
+    last_seen = now();
+end $$;
+
 -- ---------- Storage ----------
 insert into storage.buckets (id, name, public) values ('comprobantes','comprobantes', false) on conflict (id) do nothing;
 insert into storage.buckets (id, name, public) values ('portadas','portadas', true) on conflict (id) do nothing;
@@ -1129,7 +1160,7 @@ grant execute on function public.save_profile, public.publish_book, public.withd
   public.submit_payment, public.cancel_my_request, public.admin_review_payment, public.admin_update_request,
   public.admin_set_credits, public.update_contact, public.save_address, public.delete_address,
   public.buy_credits, public.admin_review_credit_purchase, public.quote_delivery,
-  public.accept_terms, public.admin_set_ban, public.set_avatar, public.add_wish, public.remove_wish, public.submit_nps, public.claim_referral, public.my_referrals to authenticated;
+  public.accept_terms, public.admin_set_ban, public.set_avatar, public.add_wish, public.remove_wish, public.submit_nps, public.claim_referral, public.my_referrals, public.track_activity to authenticated;
 
 -- ---------- Permisos de tablas (proyectos Supabase desde mayo 2026 no exponen tablas por defecto) ----------
 -- RLS sigue limitando qué filas ve cada usuario.

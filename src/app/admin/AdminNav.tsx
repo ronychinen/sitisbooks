@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 
 export default function AdminNav({ users }: { users: number }) {
   const p = usePathname();
-  const items: [string, string, number?][] = [["/admin/usuarios", "Usuarios", users], ["/admin", "Intercambios"], ["/admin/creditos", "Compras de créditos"], ["/admin/ingresos", "Ingresos"], ["/admin/nps", "NPS"], ["/admin/ajustes", "Tarifas y pagos"]];
+  const items: [string, string, number?][] = [["/admin/usuarios", "Usuarios", users], ["/admin/actividad", "Actividad"], ["/admin", "Intercambios"], ["/admin/creditos", "Compras de créditos"], ["/admin/ingresos", "Ingresos"], ["/admin/nps", "NPS"], ["/admin/ajustes", "Tarifas y pagos"]];
   return (
     <div className="subtabs">
       {items.map(([href, label, n]) => (

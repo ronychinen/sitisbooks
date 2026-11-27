@@ -298,3 +298,13 @@ tfoot th,tfoot td{border-bottom:0;border-top:2px solid var(--line);background:va
 .or{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12.5px}
 .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
 .gsi-box{display:flex;justify-content:center;width:100%}
+.act-chart{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:6px;align-items:end;height:170px}
+.act-col{display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;text-decoration:none;color:var(--muted);min-width:0;border-radius:8px;padding:2px 0}
+.act-col:hover{background:var(--bg)}
+.act-col.on{color:var(--ink);background:#EEF3FC}
+.act-n{font-size:12px;font-weight:700;color:var(--ink);min-height:15px}
+.act-bar{flex:1;width:70%;max-width:34px;display:flex;align-items:flex-end;background:var(--bg);border-radius:6px;overflow:hidden}
+.act-bar i{display:block;width:100%;background:var(--accent);border-radius:6px 6px 0 0;min-height:0}
+.act-col.on .act-bar i{background:#1F4FB0}
+.act-d{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;text-transform:capitalize}
+@media (max-width:600px){.act-chart{gap:2px}.act-d{font-size:9px}}
