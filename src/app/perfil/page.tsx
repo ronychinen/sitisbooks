@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import ChangePassword from "./ChangePassword";
 import { safeNext } from "@/lib/safe";
 import { getAddresses, getSession } from "@/lib/supabase/server";
 import AddressBook from "./AddressBook";
@@ -29,6 +30,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ b
       {!isNew && profile && <AvatarUploader userId={user.id} url={profile.avatar_url} name={`${profile.first_name} ${profile.last_name}`} />}
       <ProfileForm email={user.email ?? ""} profile={profile} next={safeNext(sp.next)} isNew={isNew} />
       {!isNew && <AddressBook addresses={addresses} />}
+      {!isNew && <ChangePassword email={user.email ?? ""} />}
       {!isNew && (
         <form action="/salir" method="post"><button className="btn ghost" type="submit">Cerrar sesión</button></form>
       )}
