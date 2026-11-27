@@ -254,3 +254,12 @@ tfoot th,tfoot td{border-bottom:0;border-top:2px solid var(--line);background:va
 .fd-txt{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 180px;font-size:14px}
 .fd-txt b{overflow-wrap:anywhere}
 .fd-txt .muted{font-size:12.5px}
+.nps-scale{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:6px}
+.nps-n{font:inherit;font-weight:700;font-size:15px;height:44px;min-width:0;padding:4px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;transition:border-color .15s,background .15s}
+.nps-n:hover{border-color:var(--accent)}
+.nps-n.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.nps-legend{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;margin-top:-6px}
+@media (max-width:480px){.nps-scale{grid-template-columns:repeat(5,minmax(0,1fr))}}
+.nps-bar{display:grid;grid-template-columns:28px 1fr 36px;align-items:center;gap:8px;font-size:13px}
+.nps-bar i{display:block;height:12px;border-radius:6px;background:var(--accent-soft);overflow:hidden}
+.nps-bar i b{display:block;height:100%;border-radius:6px}

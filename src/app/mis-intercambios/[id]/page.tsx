@@ -69,6 +69,12 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       )}
       {isReq && r.status === "pago_en_revision" && <p className="note">Recibimos tu comprobante. Lo validamos y te escribimos por WhatsApp para coordinar la entrega.</p>}
       {!isReq && r.status !== "entregado" && r.status !== "cancelado" && <p className="note">Sitisbooks te escribirá por WhatsApp al {profile.phone} para coordinar el recojo en tu dirección. No compartimos tus datos con quien recibe el libro.</p>}
+      {isReq && r.status === "entregado" && (
+        <div className="note row" style={{ justifyContent: "space-between" }}>
+          <span>¿Cómo te fue con Sitisbooks? Califícanos del 1 al 10.</span>
+          <Link className="btn sm" href={`/encuesta/${r.id}`}>Calificar</Link>
+        </div>
+      )}
       {!isReq && r.status === "entregado" && <p className="note">Tu libro llegó a su nuevo lector el {fmtD(r.delivered_at)}. Ganaste 1 crédito.</p>}
       {r.status === "cancelado" && <p className="muted">{isReq ? "Este pedido fue cancelado. Tu crédito fue devuelto." : "Este pedido fue cancelado. Tu libro volvió al catálogo."}</p>}
     </div>

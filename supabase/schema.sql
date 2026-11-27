@@ -708,7 +708,7 @@ $$;
 create or replace function public.send_status_email(p_request uuid) returns void
 language plpgsql security definer set search_path = public as $$
 declare r public.requests; p public.profiles; s public.settings; v_key text;
-        v_subject text; v_title text; v_body text; v_html text; v_link text;
+        v_subject text; v_title text; v_body text; v_html text; v_link text; v_extra text := '';
 begin
   select * into r from public.requests where id = p_request;
   if r.id is null then return; end if;
@@ -744,6 +744,13 @@ begin
     when 'entregado' then
       v_subject := 'Tu libro fue entregado'; v_title := '¡Que lo disfrutes!';
       v_body := 'Entregamos <b>' || public.html_esc(r.book_title) || '</b>. Si tienes libros que ya leíste, dónalos y gana créditos para tu próximo pedido.';
+      -- Encuesta NPS: un clic en el número abre la página con la nota preseleccionada
+      v_extra := '<div style="margin:0 0 24px;padding:18px;border:1px solid #E3E8F0;border-radius:12px;background:#F7F9FC">'
+        || '<p style="margin:0 0 12px;font-size:15px;font-weight:bold;color:#16213A">Del 1 al 10, ¿cómo te ha parecido el servicio de Sitisbooks?</p>'
+        || '<table role="presentation" style="border-collapse:separate;border-spacing:4px 0;margin:0 -4px"><tr>'
+        || (select string_agg('<td><a href="' || s.site_url || '/encuesta/' || r.id || '?s=' || n || '" style="display:block;width:34px;height:34px;line-height:34px;text-align:center;border-radius:8px;background:#fff;border:1px solid #C9D6EE;color:#2F6BDB;font-weight:bold;text-decoration:none;font-size:14px">' || n || '</a></td>', '' order by n) from generate_series(1,10) n)
+        || '</tr></table>'
+        || '<p style="margin:8px 0 0;font-size:12px;color:#5B6478">1 = nada probable · 10 = excelente. Te toma 10 segundos.</p></div>';
     when 'cancelado' then
       v_subject := 'Tu pedido fue cancelado'; v_title := 'Pedido cancelado';
       v_body := 'Tu pedido de <b>' || public.html_esc(r.book_title) || '</b> fue cancelado y te devolvimos 1 crédito.'
@@ -757,6 +764,7 @@ begin
     || '<h1 style="margin:0 0 12px;font-size:22px;color:#16213A">' || v_title || '</h1>'
     || '<p style="margin:0 0 8px;font-size:15px;line-height:1.55;color:#3B4A66">Hola ' || public.html_esc(initcap(trim(coalesce(p.first_name,'') || ' ' || coalesce(p.last_name,'')))) || ',</p>'
     || '<p style="margin:0 0 20px;font-size:15px;line-height:1.55;color:#3B4A66">' || v_body || '</p>'
+    || v_extra
     || '<a href="' || v_link || '" style="display:inline-block;background:#2F6BDB;color:#fff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:10px">Ver mi pedido</a>'
     || '<p style="margin:24px 0 0;font-size:12px;color:#5B6478">Recibes este correo porque hiciste un pedido en Sitisbooks.</p>'
     || '</div></div>';
@@ -852,6 +860,36 @@ end $$;
 revoke execute on function public.send_admin_new_request(uuid, text, text) from public, anon, authenticated;
 revoke execute on function public.send_status_email(uuid) from public, anon, authenticated;
 
+-- v19: encuesta NPS tras la entrega
+create table if not exists public.nps_responses (
+  id          bigint generated always as identity primary key,
+  request_id  uuid unique references public.requests(id) on delete set null,
+  user_id     uuid not null references public.profiles(id) on delete cascade,
+  book_title  text,
+  score       int  not null check (score between 1 and 10),
+  comment     text check (char_length(comment) <= 1000),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+alter table public.nps_responses enable row level security;
+drop policy if exists "nps propio o admin" on public.nps_responses;
+create policy "nps propio o admin" on public.nps_responses for select to authenticated
+  using (user_id = auth.uid() or public.is_admin());
+grant select on public.nps_responses to authenticated;
+
+create or replace function public.submit_nps(p_request uuid, p_score int, p_comment text)
+returns void language plpgsql security definer set search_path = public as $$
+declare r public.requests;
+begin
+  select * into r from public.requests where id = p_request and requester_id = auth.uid();
+  if r.id is null then raise exception 'No encontramos este pedido en tu cuenta'; end if;
+  if r.status <> 'entregado' then raise exception 'La encuesta se habilita cuando recibes el libro'; end if;
+  if p_score is null or p_score not between 1 and 10 then raise exception 'Elige una nota del 1 al 10'; end if;
+  insert into public.nps_responses (request_id, user_id, book_title, score, comment)
+  values (r.id, auth.uid(), r.book_title, p_score, nullif(left(trim(coalesce(p_comment,'')), 1000), ''))
+  on conflict (request_id) do update set score = excluded.score, comment = excluded.comment, updated_at = now();
+end $$;
+
 -- ---------- Storage ----------
 insert into storage.buckets (id, name, public) values ('comprobantes','comprobantes', false) on conflict (id) do nothing;
 insert into storage.buckets (id, name, public) values ('portadas','portadas', true) on conflict (id) do nothing;
@@ -911,7 +949,7 @@ grant execute on function public.save_profile, public.publish_book, public.withd
   public.submit_payment, public.cancel_my_request, public.admin_review_payment, public.admin_update_request,
   public.admin_set_credits, public.update_contact, public.save_address, public.delete_address,
   public.buy_credits, public.admin_review_credit_purchase, public.quote_delivery,
-  public.accept_terms, public.admin_set_ban, public.set_avatar, public.add_wish, public.remove_wish to authenticated;
+  public.accept_terms, public.admin_set_ban, public.set_avatar, public.add_wish, public.remove_wish, public.submit_nps to authenticated;
 
 -- ---------- Permisos de tablas (proyectos Supabase desde mayo 2026 no exponen tablas por defecto) ----------
 -- RLS sigue limitando qué filas ve cada usuario.
