@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getSession } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
+import ReviewCover from "@/components/ReviewCover";
 import GenreTag from "@/components/GenreTag";
 import SmoothLink from "@/components/SmoothLink";
 import CatalogFilters from "./CatalogFilters";
@@ -106,7 +107,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
         <div className="shelf">
           {books.map((b) => (
             <article className="book" key={b.book_key}>
-              <BookCover title={b.title} author={b.author} url={b.cover_url} tag={b.condition} />
+              <ReviewCover title={b.title} author={b.author} url={b.cover_url} tag={b.condition} genre={b.genre} description={b.description} requestHref={b.request_id ? `/pedir/${b.request_id}` : null} />
               <div className="title" title={b.title}>{b.title}</div>
               <div className="author" title={b.author}>{b.author}</div>
               <div className="row" style={{ gap: 6 }}><GenreTag genre={b.genre} /><span className="copies">{copiesLabel(b.copies)}</span></div>

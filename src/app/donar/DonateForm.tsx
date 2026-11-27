@@ -27,6 +27,27 @@ export default function DonateForm({ addresses, initial }: { addresses: Address[
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
+  // Reseña: se busca sola al confirmar la portada; el usuario puede editarla
+  const [summary, setSummary] = useState("");
+  const [summaryState, setSummaryState] = useState<"idle" | "loading" | "found" | "none">("idle");
+  const summaryEdited = useRef(false);
+  const summaryFor = useRef("");
+  useEffect(() => {
+    if (!cover || title.trim().length < 2) return;
+    const key = `${title.trim()}|${author.trim()}`;
+    if (summaryFor.current === key || summaryEdited.current) return;
+    summaryFor.current = key;
+    setSummaryState("loading");
+    const ctrl = new AbortController();
+    fetch(`/api/summary?title=${encodeURIComponent(title.trim())}&author=${encodeURIComponent(author.trim())}`, { signal: ctrl.signal })
+      .then((r) => r.json())
+      .then((j: { summary: string | null }) => {
+        if (summaryEdited.current) return;
+        if (j.summary) { setSummary(j.summary); setSummaryState("found"); } else { setSummary(""); setSummaryState("none"); }
+      })
+      .catch(() => { if (!ctrl.signal.aborted) setSummaryState("none"); });
+    return () => ctrl.abort();
+  }, [cover, title, author]);
   const lastQuery = useRef(initial?.cover ? `${initial.title.trim()}|${initial.author.trim()}` : "");
   const [sugs, setSugs] = useState<Candidate[]>([]);
   const [sugOpen, setSugOpen] = useState(false);
@@ -125,15 +146,18 @@ export default function DonateForm({ addresses, initial }: { addresses: Address[
     if (titleErr || authorErr) { setError("Corrige el título o el autor antes de publicar."); return; }
     if (!cover) { setError("Confirma la portada o elige publicar sin portada."); return; }
     setBusy(true); setError("");
-    const { error } = await supabase.rpc("publish_book", {
+    const base = {
       p_title: title, p_author: author, p_cover_url: cover.kind === "none" ? "" : cover.url,
       p_genre: genre, p_condition: condition, p_address: addressId || null,
-    });
+    };
+    let { error } = await supabase.rpc("publish_book", { ...base, p_description: summary.trim() || null });
+    if (error?.code === "PGRST202") ({ error } = await supabase.rpc("publish_book", base)); // base de datos aún sin actualizar
     setBusy(false);
     if (error) { setError(error.message || "No pudimos publicar el libro. Inténtalo de nuevo."); return; }
     setDone(title);
     setTitle(""); setAuthor(""); setGenre(""); setCondition("");
     setCandidates(null); setPicked(null); setCover(null); lastQuery.current = "";
+    setSummary(""); setSummaryState("idle"); summaryEdited.current = false; summaryFor.current = "";
     typedTitle.current = false; setSugs([]); setSugOpen(false);
     router.refresh();
   }
@@ -173,7 +197,17 @@ export default function DonateForm({ addresses, initial }: { addresses: Address[
             <button type="button" className="linkbtn" onClick={() => setCover(null)}>Cambiar portada</button>
           </div>
         </div>
-      ) : searching ? (
+      ) : null}
+      {cover && (
+        <label>Reseña breve <span className="muted" style={{ fontWeight: 400 }}>(opcional · se muestra al tocar la portada en el catálogo)</span>
+          <textarea rows={5} maxLength={2000} value={summary}
+            placeholder={summaryState === "loading" ? "Buscando una reseña del libro…" : "Cuenta de qué trata el libro en pocas líneas."}
+            onChange={(e) => { summaryEdited.current = true; setSummary(e.target.value); }} />
+          {summaryState === "found" && !summaryEdited.current && <span className="muted" style={{ fontSize: 12, fontWeight: 400 }}>La encontramos automáticamente. Revísala y edítala si hace falta.</span>}
+          {summaryState === "none" && !summary && <span className="muted" style={{ fontSize: 12, fontWeight: 400 }}>No encontramos una reseña para este libro. Puedes escribir una corta.</span>}
+        </label>
+      )}
+      {cover ? null : searching ? (
         <p className="muted">Buscando portadas…</p>
       ) : candidates ? (
         <div className="stack" style={{ gap: 10 }}>

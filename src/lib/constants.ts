@@ -29,6 +29,7 @@ export type CatalogBook = {
 export type CatalogGroup = {
   book_key: string; copies: number; my_copies: number; created_at: string;
   title: string; author: string; genre: string; condition: string; cover_url: string | null; request_id: string | null;
+  description?: string | null;
 };
 export const CONDITION_RANK: Record<string, number> = { "Nuevo": 1, "Como nuevo": 2, "Buen estado": 3, "Usado": 4 };
 export const copiesLabel = (n: number) => `${n} ${n === 1 ? "ejemplar" : "ejemplares"}`;

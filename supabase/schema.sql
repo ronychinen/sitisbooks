@@ -445,8 +445,12 @@ end $$;
 
 -- ---------- Libros ----------
 drop function if exists public.publish_book(text, text, text, text, text);
+alter table public.books add column if not exists description text;
+alter table public.books drop constraint if exists books_description_len;
+alter table public.books add constraint books_description_len check (char_length(description) <= 2000);
+drop function if exists public.publish_book(text, text, text, text, text, uuid);
 create or replace function public.publish_book(
-  p_title text, p_author text, p_cover_url text, p_genre text, p_condition text, p_address uuid
+  p_title text, p_author text, p_cover_url text, p_genre text, p_condition text, p_address uuid, p_description text default null
 ) returns uuid language plpgsql security definer set search_path = public as $$
 declare a public.addresses; v_id uuid; v_err text;
 begin
@@ -455,12 +459,17 @@ begin
   if v_err is not null then raise exception 'El título %', v_err; end if;
   v_err := public.contact_violation(p_author);
   if v_err is not null then raise exception 'El autor %', v_err; end if;
+  p_description := nullif(left(trim(coalesce(p_description,'')), 2000), '');
+  -- En la reseña se permiten años y cifras, pero no teléfonos, correos ni enlaces
+  if p_description ~ '(^|[^0-9])9([ -]?[0-9]){8}([^0-9]|$)' or p_description ~ '\+ ?51' then raise exception 'La reseña no puede incluir números de teléfono'; end if;
+  if p_description ~ '@' then raise exception 'La reseña no puede incluir correos ni usuarios (@)'; end if;
+  if p_description ~* '(https?://|www\.)' then raise exception 'La reseña no puede incluir enlaces'; end if;
   select * into a from public.addresses where user_id = auth.uid()
     order by (id = p_address) desc, is_default desc, created_at limit 1;
   if a.id is null then raise exception 'Agrega una dirección de recojo en tu perfil'; end if;
   if p_address is not null and a.id <> p_address then raise exception 'Elige una de tus direcciones'; end if;
-  insert into public.books (owner_id, title, author, cover_url, genre, condition, district, pickup_label, pickup_address, pickup_reference, pickup_lat, pickup_lng)
-  values (auth.uid(), trim(p_title), trim(p_author), nullif(p_cover_url,''), p_genre, p_condition, a.district, a.label, concat_ws(', ', a.address, a.unit), a.reference, a.lat, a.lng)
+  insert into public.books (owner_id, title, author, cover_url, genre, condition, district, pickup_label, pickup_address, pickup_reference, pickup_lat, pickup_lng, description)
+  values (auth.uid(), trim(p_title), trim(p_author), nullif(p_cover_url,''), p_genre, p_condition, a.district, a.label, concat_ws(', ', a.address, a.unit), a.reference, a.lat, a.lng, p_description)
   returning id into v_id;
   return v_id;
 end $$;
@@ -982,7 +991,7 @@ $$;
 create or replace view public.catalog as
   select id, title, author, cover_url, genre, condition, created_at,
          (owner_id = auth.uid()) as is_mine,
-         public.book_key(title, author) as book_key
+         public.book_key(title, author) as book_key, description
   from public.books
   where status = 'disponible';
 
@@ -990,7 +999,7 @@ create or replace view public.catalog as
 -- request_id = el ejemplar a pedir (de otra persona, mejor estado primero).
 create or replace view public.catalog_groups as
   with b as (
-    select id, title, author, cover_url, genre, condition, created_at, owner_id,
+    select id, title, author, cover_url, genre, condition, created_at, owner_id, description,
            public.book_key(title, author) as book_key,
            case condition when 'Nuevo' then 1 when 'Como nuevo' then 2 when 'Buen estado' then 3 else 4 end as rank
     from public.books where status = 'disponible'
@@ -1003,7 +1012,8 @@ create or replace view public.catalog_groups as
   select g.book_key, g.copies, g.my_copies, g.created_at,
          rep.title, rep.author, rep.genre, rep.condition,
          coalesce(rep.cover_url, (select b2.cover_url from b b2 where b2.book_key = g.book_key and b2.cover_url is not null order by b2.created_at desc limit 1)) as cover_url,
-         (select b3.id from b b3 where b3.book_key = g.book_key and b3.owner_id is distinct from auth.uid() order by b3.rank, b3.created_at limit 1) as request_id
+         (select b3.id from b b3 where b3.book_key = g.book_key and b3.owner_id is distinct from auth.uid() order by b3.rank, b3.created_at limit 1) as request_id,
+         coalesce(rep.description, (select b4.description from b b4 where b4.book_key = g.book_key and b4.description is not null order by b4.created_at desc limit 1)) as description
   from g
   cross join lateral (
     select b1.* from b b1 where b1.book_key = g.book_key
