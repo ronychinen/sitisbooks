@@ -1,12 +1,13 @@
 "use client";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { safeNext } from "@/lib/safe";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginForm() {
   const supabase = createClient();
   const router = useRouter();
-  const next = useSearchParams().get("next") || "/";
+  const next = safeNext(useSearchParams().get("next"));
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");

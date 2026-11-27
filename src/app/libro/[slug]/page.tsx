@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { jsonLd as toJsonLd } from "@/lib/safe";
 import type { Metadata } from "next";
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
@@ -89,7 +90,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
 
   return (
     <div className="stack" style={{ gap: 32 }}>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: toJsonLd(jsonLd) }} />
       <nav className="muted crumbs" aria-label="Ruta">
         <Link href="/#catalogo">Catálogo</Link> › <Link href={`/?g=${encodeURIComponent(g.genre)}#catalogo`}>{g.genre}</Link> › <span>{g.title}</span>
       </nav>

@@ -77,6 +77,8 @@ async function googleBooks(title: string, author: string): Promise<Candidate[]> 
 }
 
 export async function GET(req: NextRequest) {
+  // Solo para la propia web: evita que otros sitios gasten la cuota de las APIs de libros
+  if (req.headers.get("sec-fetch-site") === "cross-site") return NextResponse.json({ error: "No permitido" }, { status: 403 });
   const title = (req.nextUrl.searchParams.get("title") || "").trim().slice(0, 160);
   const author = (req.nextUrl.searchParams.get("author") || "").trim().slice(0, 120);
   if (title.length < 2) return NextResponse.json({ candidates: [] });

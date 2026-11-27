@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { jsonLd as toJsonLd } from "@/lib/safe";
 import { getSession } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
 import ReviewCover from "@/components/ReviewCover";
@@ -42,7 +43,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: toJsonLd(jsonLd) }} />
       {shared && (
         <ReviewCover autoOpen hideTrigger title={shared.title} author={shared.author} url={shared.cover_url} genre={shared.genre} description={shared.description}
           requestHref={shared.request_id ? (user ? `/pedir/${shared.request_id}` : `/ingresar?next=${encodeURIComponent(`/pedir/${shared.request_id}`)}`) : null}

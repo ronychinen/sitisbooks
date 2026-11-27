@@ -521,11 +521,13 @@ drop function if exists public.submit_payment(uuid, text, text, text);
 create or replace function public.submit_payment(p_request uuid, p_method text, p_operation text, p_proof text, p_proof_url text default null)
 returns void language plpgsql security definer set search_path = public as $$
 begin
+  -- El comprobante debe estar en la carpeta del propio usuario
+  if coalesce(p_proof,'') = '' or split_part(p_proof, '/', 1) <> auth.uid()::text then raise exception 'Adjunta tu comprobante'; end if;
   update public.requests set payment_method = p_method, operation_code = nullif(trim(p_operation),''),
     proof_path = p_proof, payment_note = null, status = 'pago_en_revision'
   where id = p_request and requester_id = auth.uid() and status = 'pendiente_pago';
   if not found then raise exception 'Este pedido no está esperando pago'; end if;
-  if p_proof_url is not null and p_proof_url !~ '^https://' then p_proof_url := null; end if;
+  if p_proof_url is not null and p_proof_url !~ '^https://[A-Za-z0-9.-]+\.supabase\.co/storage/v1/object/sign/comprobantes/' then p_proof_url := null; end if;
   perform public.send_admin_new_request(p_request, p_proof_url, p_proof);
 end $$;
 
@@ -843,7 +845,7 @@ begin
     || format(v_row, 'Pedido', public.fmt_lima(r.created_at))
     || '</table>'
     || '<p style="margin:20px 0 0;font-size:14px;color:#3B4A66">'
-    || case when p_proof_url is not null then 'El comprobante va adjunto. También puedes <a href="' || p_proof_url || '" style="color:#2F6BDB">verlo aquí</a> (enlace válido 7 días).' else 'Revisa el comprobante en el admin.' end
+    || case when p_proof_url is not null then 'El comprobante va adjunto. También puedes <a href="' || public.html_esc(p_proof_url) || '" style="color:#2F6BDB">verlo aquí</a> (enlace válido 7 días).' else 'Revisa el comprobante en el admin.' end
     || '</p>'
     || '<a href="' || s.site_url || '/admin?st=pago_en_revision" style="display:inline-block;margin-top:16px;background:#2F6BDB;color:#fff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:10px">Validar en el admin</a>'
     || '</div></div>';
@@ -968,7 +970,7 @@ begin
     v_html := public.mail_layout(
       '¡Llegó el libro que buscabas!',
       'Hola ' || public.html_esc(initcap(trim(coalesce(w.first_name,'') || ' ' || coalesce(w.last_name,'')))) || ',',
-      coalesce('<img src="' || public.html_esc(b.cover_url) || '" alt="" width="96" style="display:block;width:96px;border-radius:6px;margin:0 0 14px">', '')
+      case when coalesce(b.cover_url,'') ~ '^https://' then '<img src="' || public.html_esc(b.cover_url) || '" alt="" width="96" style="display:block;width:96px;border-radius:6px;margin:0 0 14px">' else '' end
         || 'Alguien acaba de publicar <b>' || public.html_esc(b.title) || '</b> de ' || public.html_esc(b.author)
         || ', que está en tu lista de deseos. Está en estado <b>' || public.html_esc(lower(b.condition)) || '</b>.'
         || '<br><br>Pídelo pronto: si otro lector lo pide primero, se reserva para él.',
@@ -1110,8 +1112,12 @@ create policy "admin borra de publico" on storage.objects for delete to authenti
   using (bucket_id = 'publico' and public.is_admin());
 
 -- ---------- Permisos de ejecución ----------
-revoke execute on all functions in schema public from public, anon;
+-- Nadie ejecuta funciones salvo las que se habilitan explícitamente abajo
+-- (Supabase da EXECUTE a anon/authenticated por defecto en funciones nuevas)
+revoke execute on all functions in schema public from public, anon, authenticated;
+alter default privileges in schema public revoke execute on functions from public, anon, authenticated;
 grant execute on function public.is_admin to anon, authenticated;
+grant execute on function public.admin_delete_cancelled(uuid[]) to authenticated;
 grant execute on function public.save_profile, public.publish_book, public.withdraw_book, public.request_book,
   public.submit_payment, public.cancel_my_request, public.admin_review_payment, public.admin_update_request,
   public.admin_set_credits, public.update_contact, public.save_address, public.delete_address,
@@ -1132,6 +1138,21 @@ alter table public.district_centroids enable row level security;
 drop policy if exists "centros publicos" on public.district_centroids;
 create policy "centros publicos" on public.district_centroids for select using (true);
 grant select on public.district_centroids to anon, authenticated;
+
+-- Escritura directa en tablas: prohibida para usuarios (todo pasa por funciones con validación)
+revoke insert, update, delete, truncate, references, trigger on all tables in schema public from anon, authenticated;
+alter default privileges in schema public revoke insert, update, delete, truncate on tables from anon, authenticated;
+grant update on public.settings to authenticated;   -- RLS: solo admin
+
+-- pg_net: los usuarios no pueden enviar peticiones HTTP desde la base de datos
+do $$ begin
+  execute 'revoke execute on all functions in schema net from public, anon, authenticated';
+exception when others then null; end $$;
+
+-- Storage: tamaño y tipo de archivo permitidos por bucket
+update storage.buckets set file_size_limit = 8388608,  allowed_mime_types = array['image/jpeg','image/png','image/webp','image/heic','image/heif','image/gif','application/pdf'] where id = 'comprobantes';
+update storage.buckets set file_size_limit = 5242880,  allowed_mime_types = array['image/jpeg','image/png','image/webp','image/gif'] where id in ('portadas','avatares');
+update storage.buckets set file_size_limit = 3145728,  allowed_mime_types = array['image/jpeg','image/png','image/webp'] where id = 'publico';
 
 -- ---------- Privacidad: vistas seguras para usuarios ----------
 -- Los usuarios NUNCA leen las tablas books/requests directamente: solo estas vistas,
