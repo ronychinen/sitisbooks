@@ -293,3 +293,7 @@ tfoot th,tfoot td{border-bottom:0;border-top:2px solid var(--line);background:va
 .auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:12px;background:var(--bg);border:1px solid var(--line)}
 .auth-tabs button{font:inherit;font-weight:600;font-size:14px;padding:9px 8px;border:0;border-radius:9px;background:transparent;color:var(--muted);cursor:pointer}
 .auth-tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(16,24,40,.08)}
+.btn.google{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#fff;color:#1F1F1F;border:1px solid #DADCE0;font-weight:600}
+.btn.google:hover{background:#F8F9FA;border-color:#C6CACF}
+.or{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12.5px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}

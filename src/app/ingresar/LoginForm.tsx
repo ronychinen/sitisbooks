@@ -6,12 +6,16 @@ import { createClient } from "@/lib/supabase/client";
 import PasswordInput from "@/components/PasswordInput";
 
 type Mode = "login" | "signup" | "reset";
+
+// Se activa cuando Google esté configurado en Supabase (Authentication → Providers → Google)
+const GOOGLE_LOGIN = false;
 type Step = "form" | "code" | "password";
 
 export default function LoginForm() {
   const supabase = createClient();
   const router = useRouter();
-  const next = safeNext(useSearchParams().get("next"));
+  const sp = useSearchParams();
+  const next = safeNext(sp.get("next"));
   const [mode, setMode] = useState<Mode>("login");
   const [step, setStep] = useState<Step>("form");
   const [email, setEmail] = useState("");
@@ -19,8 +23,9 @@ export default function LoginForm() {
   const [password2, setPassword2] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(sp.get("error") ?? "");
   const [info, setInfo] = useState("");
+  const [userId, setUserId] = useState("");
   const mail = email.trim().toLowerCase();
 
   function go(m: Mode) { setMode(m); setStep("form"); setError(""); setInfo(""); setCode(""); setPassword(""); setPassword2(""); }
@@ -29,6 +34,15 @@ export default function LoginForm() {
     const { data: profile } = await supabase.from("profiles").select("id").eq("id", userId).maybeSingle();
     router.replace(profile ? next : `/perfil?bienvenida=1&next=${encodeURIComponent(next)}`);
     router.refresh();
+  }
+
+  async function google() {
+    setBusy(true); setError("");
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`, queryParams: { prompt: "select_account" } },
+    });
+    if (error) { setBusy(false); setError("No pudimos abrir el ingreso con Google. Inténtalo otra vez."); }
   }
 
   async function login(e: React.FormEvent) {
@@ -66,6 +80,7 @@ export default function LoginForm() {
     const { data, error } = await supabase.auth.verifyOtp({ email: mail, token: code.trim(), type: "email" });
     setBusy(false);
     if (error || !data.user) { setError("El código no es válido o ya venció. Pide uno nuevo."); return; }
+    setUserId(data.user.id);
     setStep("password");
   }
 
@@ -83,6 +98,16 @@ export default function LoginForm() {
     await finish(data.user.id);
   }
 
+  const googleBtn = !GOOGLE_LOGIN ? null : (
+    <>
+      <button type="button" className="btn ghost google" onClick={google} disabled={busy}>
+        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+        Continuar con Google
+      </button>
+      <div className="or"><span>o con tu correo</span></div>
+    </>
+  );
+
   const tabs = (
     <div className="auth-tabs" role="tablist">
       <button type="button" role="tab" aria-selected={mode === "login"} onClick={() => go("login")}>Ingresar</button>
@@ -93,7 +118,7 @@ export default function LoginForm() {
   if (step === "code") return (
     <form className="stack" onSubmit={verify}>
       <div>
-        <p className="eyebrow">{mode === "signup" ? "Paso 1 de 2 · Verifica tu correo" : "Recupera tu contraseña"}</p>
+        <p className="eyebrow">{mode === "signup" ? "Paso 1 de 2 · Verifica tu correo" : "Entra con un código"}</p>
         <h2>Ingresa el código</h2>
         <p className="muted" style={{ marginTop: 6 }}>{info}</p>
       </div>
@@ -102,7 +127,7 @@ export default function LoginForm() {
           value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="••••••" autoFocus />
       </label>
       {error && <p className="error">{error}</p>}
-      <button className="btn" disabled={busy || code.length < 6}>{busy ? "Verificando…" : "Verificar"}</button>
+      <button className="btn" disabled={busy || code.length < 6}>{busy ? "Verificando…" : mode === "reset" ? "Entrar" : "Verificar"}</button>
       <div className="row between">
         <button type="button" className="linkbtn" onClick={() => { setStep("form"); setCode(""); setError(""); }}>Cambiar correo</button>
         <button type="button" className="linkbtn" disabled={busy} onClick={() => sendCode()}>Reenviar código</button>
@@ -113,25 +138,24 @@ export default function LoginForm() {
   if (step === "password") return (
     <form className="stack" onSubmit={savePassword}>
       <div>
-        <p className="eyebrow">{mode === "signup" ? "Paso 2 de 2" : "Recupera tu contraseña"}</p>
-        <h2>{mode === "signup" ? "Crea tu contraseña" : "Elige una nueva contraseña"}</h2>
+        <p className="eyebrow">{mode === "signup" ? "Paso 2 de 2" : "¡Listo, ya ingresaste!"}</p>
+        <h2>{mode === "signup" ? "Crea tu contraseña" : "¿Quieres crear una nueva contraseña?"}</h2>
         <p className="muted" style={{ marginTop: 6 }}>Con ella entrarás la próxima vez, sin códigos. Mínimo 8 caracteres.</p>
       </div>
       <input type="email" autoComplete="username" value={mail} readOnly hidden />
       <label>Contraseña<PasswordInput id="pw1" autoComplete="new-password" value={password} onChange={setPassword} autoFocus /></label>
       <label>Repite la contraseña<PasswordInput id="pw2" autoComplete="new-password" value={password2} onChange={setPassword2} /></label>
       {error && <p className="error">{error}</p>}
-      <button className="btn" disabled={busy}>{busy ? "Guardando…" : mode === "signup" ? "Crear cuenta" : "Guardar y entrar"}</button>
+      <button className="btn" disabled={busy}>{busy ? "Guardando…" : mode === "signup" ? "Crear cuenta" : "Guardar y continuar"}</button>
+      {mode === "reset" && <button type="button" className="linkbtn" style={{ alignSelf: "flex-start" }} disabled={busy} onClick={() => finish(userId)}>Ahora no, continuar sin contraseña</button>}
     </form>
   );
 
   if (mode === "login") return (
     <form className="stack" onSubmit={login}>
       {tabs}
-      <div>
-        <h2>Entra a tu cuenta</h2>
-        <p className="muted" style={{ marginTop: 6 }}>Usa tu correo y contraseña.</p>
-      </div>
+      <h2 style={{ margin: 0 }}>Entra a tu cuenta</h2>
+      {googleBtn}
       <label>Correo electrónico
         <input id="email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tucorreo@gmail.com" />
       </label>
@@ -139,7 +163,7 @@ export default function LoginForm() {
       {error && <p className="error">{error}</p>}
       <button className="btn" disabled={busy}>{busy ? "Ingresando…" : "Ingresar"}</button>
       <div className="row between">
-        <button type="button" className="linkbtn" onClick={() => go("reset")}>¿Olvidaste tu contraseña?</button>
+        <button type="button" className="linkbtn" onClick={() => go("reset")}>¿Olvidaste tu contraseña? Entra con un código</button>
         <button type="button" className="linkbtn" onClick={() => go("signup")}>Crear una cuenta</button>
       </div>
     </form>
@@ -148,12 +172,13 @@ export default function LoginForm() {
   return (
     <form className="stack" onSubmit={sendCode}>
       {mode === "signup" ? tabs : null}
+      {mode === "signup" && googleBtn}
       <div>
-        {mode === "reset" && <p className="eyebrow">Recupera tu contraseña</p>}
-        <h2>{mode === "signup" ? "Crea tu cuenta" : "¿Olvidaste tu contraseña?"}</h2>
+        {mode === "reset" && <p className="eyebrow">Ingreso sin contraseña</p>}
+        <h2>{mode === "signup" ? "Crea tu cuenta" : "Entra con un código"}</h2>
         <p className="muted" style={{ marginTop: 6 }}>
           {mode === "signup" ? "Te enviaremos un código para confirmar que el correo es tuyo y luego creas tu contraseña. Recibes 1 crédito de bienvenida."
-            : "Te enviaremos un código a tu correo para que elijas una nueva contraseña."}
+            : "¿Olvidaste tu contraseña? Te enviaremos un código a tu correo para entrar. Luego puedes crear una nueva, si quieres."}
         </p>
       </div>
       <label>Correo electrónico
