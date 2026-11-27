@@ -297,3 +297,4 @@ tfoot th,tfoot td{border-bottom:0;border-top:2px solid var(--line);background:va
 .btn.google:hover{background:#F8F9FA;border-color:#C6CACF}
 .or{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:12.5px}
 .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.gsi-box{display:flex;justify-content:center;width:100%}
