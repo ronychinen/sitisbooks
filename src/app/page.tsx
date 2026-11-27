@@ -41,7 +41,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <section className="lp-hero">
         <div className="lp-copy">
-          <span className="lp-badge"><i aria-hidden="true" />Intercambio de libros en Lima y Callao</span>
+          <span className="lp-badge"><i aria-hidden="true" />Intercambio de libros en Lima</span>
           <h1 className="lp-title">Dona los libros que ya leíste. <span>Recibe los que quieres leer.</span></h1>
           <p className="lp-lead">Cada libro que donas te da 1 crédito para pedir otro. Solo pagas el delivery y una comisión fija. Nosotros coordinamos todo.</p>
           <div className="lp-ctas">
