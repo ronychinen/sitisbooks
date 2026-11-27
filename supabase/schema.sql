@@ -810,6 +810,16 @@ drop policy if exists "borrar avatar propio" on storage.objects;
 create policy "borrar avatar propio" on storage.objects for delete to authenticated
   using (bucket_id = 'avatares' and (storage.foldername(name))[1] = auth.uid()::text);
 
+-- v15: QR de Yape (imagen pública subida por el admin)
+alter table public.settings add column if not exists yape_qr_url text;
+insert into storage.buckets (id, name, public) values ('publico','publico', true) on conflict (id) do nothing;
+drop policy if exists "admin sube a publico" on storage.objects;
+create policy "admin sube a publico" on storage.objects for insert to authenticated
+  with check (bucket_id = 'publico' and public.is_admin());
+drop policy if exists "admin borra de publico" on storage.objects;
+create policy "admin borra de publico" on storage.objects for delete to authenticated
+  using (bucket_id = 'publico' and public.is_admin());
+
 -- ---------- Permisos de ejecución ----------
 revoke execute on all functions in schema public from public, anon;
 grant execute on function public.is_admin to anon, authenticated;

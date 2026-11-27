@@ -238,3 +238,11 @@ footer.foot a{color:var(--muted)}footer.foot a:hover{color:var(--ink)}
 .avatar-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .avatar-cam{position:absolute;right:2px;bottom:2px;width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;border:2px solid #fff}
 tfoot th,tfoot td{border-bottom:0;border-top:2px solid var(--line);background:var(--bg)}
+.copyrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.copyrow .sel,.copyrow .ph{overflow-wrap:anywhere;min-width:0}
+.bank dd.copyrow{display:flex}
+.copy{flex:none;font:inherit;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--accent);cursor:pointer;line-height:1.4}
+.copy:hover{border-color:var(--accent)}
+.yape-qr{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-top:8px}
+.yape-qr img{width:180px;height:180px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px;flex:none}
+.yape-qr>div{flex:1 1 160px;min-width:0}

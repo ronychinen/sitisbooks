@@ -27,6 +27,22 @@ export default function SettingsForm({ initial, centroids }: { initial: Settings
   const examples: [string, string][] = [["Miraflores", "Santiago de Surco"], ["San Isidro", "Miraflores"], ["Los Olivos", "San Miguel"], ["San Juan de Lurigancho", "Miraflores"]];
   const [yape, setYape] = useState(initial?.yape_number ?? "");
   const [holder, setHolder] = useState(initial?.yape_holder ?? "");
+  const [qrUrl, setQrUrl] = useState(initial?.yape_qr_url ?? "");
+  const [qrBusy, setQrBusy] = useState(false);
+  async function uploadQr(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setMsg("El QR debe ser una imagen (PNG o JPG)."); return; }
+    if (file.size > 3 * 1024 * 1024) { setMsg("La imagen del QR debe pesar menos de 3 MB."); return; }
+    setQrBusy(true); setMsg("");
+    const sb = createClient();
+    const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+    const path = `yape-qr-${Date.now()}.${ext}`;
+    const { error } = await sb.storage.from("publico").upload(path, file, { contentType: file.type, cacheControl: "31536000" });
+    setQrBusy(false);
+    if (error) { setMsg("No se pudo subir el QR. ¿Ya corriste el schema.sql?"); return; }
+    setQrUrl(sb.storage.from("publico").getPublicUrl(path).data.publicUrl);
+    setMsg("QR cargado. Pulsa Guardar ajustes para publicarlo.");
+  }
   const [bankName, setBankName] = useState(initial?.bank_name ?? "");
   const [bankHolder, setBankHolder] = useState(initial?.bank_holder ?? "");
   const [bankAccount, setBankAccount] = useState(initial?.bank_account ?? "");
@@ -41,7 +57,7 @@ export default function SettingsForm({ initial, centroids }: { initial: Settings
       fee: Math.max(0, Number(fee) || 0), default_tariff: Math.max(0, Number(def) || 0),
       ...params, road_factor: factor,
       credit_price: creditPrice.trim() === "" || !(Number(creditPrice) > 0) ? null : Number(creditPrice),
-      yape_number: yape.trim() || null, yape_holder: holder.trim() || null,
+      yape_number: yape.trim() || null, yape_holder: holder.trim() || null, yape_qr_url: qrUrl || null,
       bank_name: bankName.trim() || null, bank_holder: bankHolder.trim() || null, bank_account: bankAccount.trim() || null, bank_cci: bankCci.trim() || null, updated_at: new Date().toISOString(),
     }).eq("id", 1);
     setBusy(false);
@@ -61,6 +77,21 @@ export default function SettingsForm({ initial, centroids }: { initial: Settings
         <div className="grid2">
           <label>Número de Yape<input id="yape" inputMode="numeric" maxLength={9} value={yape} onChange={(e) => setYape(e.target.value.replace(/\D/g, ""))} /></label>
           <label>Titular de Yape<input id="holder" maxLength={80} value={holder} onChange={(e) => setHolder(e.target.value)} /></label>
+        </div>
+        <div className="yape-qr" style={{ marginTop: 0 }}>
+          {qrUrl
+            ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={qrUrl} alt="QR de Yape" width={180} height={180} />
+            : <div className="muted" style={{ fontSize: 13, flex: "none", width: 180, height: 180, display: "grid", placeItems: "center", border: "1px dashed var(--line)", borderRadius: 8, textAlign: "center", padding: 8, boxSizing: "border-box" }}>Sin QR</div>}
+          <div className="stack" style={{ gap: 8 }}>
+            <b style={{ fontSize: 14 }}>QR de Yape</b>
+            <span className="muted" style={{ fontSize: 13 }}>En Yape: Mi QR → Descargar/Compartir. Sube esa imagen (PNG o JPG, máx. 3 MB).</span>
+            <div className="row">
+              <label className="btn ghost" style={{ cursor: "pointer" }}>{qrBusy ? "Subiendo…" : qrUrl ? "Cambiar QR" : "Subir QR"}
+                <input type="file" accept="image/png,image/jpeg,image/webp" hidden disabled={qrBusy} onChange={(e) => { uploadQr(e.target.files?.[0]); e.target.value = ""; }} />
+              </label>
+              {qrUrl && <button type="button" className="btn ghost" onClick={() => { setQrUrl(""); setMsg("QR quitado. Pulsa Guardar ajustes para confirmar."); }}>Quitar</button>}
+            </div>
+          </div>
         </div>
         <b style={{ fontSize: 14 }}>Datos para transferencia</b>
         {legacyBank && <p className="muted" style={{ fontSize: 13, margin: 0 }}>Datos anteriores (texto libre): {legacyBank}. Al completar los campos de abajo se mostrarán estos en su lugar.</p>}

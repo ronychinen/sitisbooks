@@ -60,7 +60,7 @@ export type Request = {
 };
 export type Settings = {
   id: number; fee: number; tariffs: Record<string, number>; default_tariff: number;
-  yape_number: string | null; yape_holder: string | null; bank_info: string | null;
+  yape_number: string | null; yape_holder: string | null; yape_qr_url?: string | null; bank_info: string | null;
   credit_price: number | null;
   bank_name: string | null; bank_holder: string | null; bank_account: string | null; bank_cci: string | null;
   origin_lat: number; origin_lng: number; km_base_fare: number; km_price: number; km_min_fee: number; km_max_fee: number | null; road_factor: number;
