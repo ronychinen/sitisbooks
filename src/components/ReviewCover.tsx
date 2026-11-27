@@ -6,10 +6,10 @@ import GenreTag from "./GenreTag";
 import { isSpanish } from "@/lib/lang";
 import ShareButtons from "./ShareButtons";
 
-type Props = { title: string; author: string; url: string | null; tag?: string; genre?: string; description?: string | null; requestHref?: string | null; shareUrl?: string; autoOpen?: boolean; hideTrigger?: boolean };
+type Props = { title: string; author: string; url: string | null; tag?: string; genre?: string; description?: string | null; requestHref?: string | null; shareUrl?: string; autoOpen?: boolean; hideTrigger?: boolean; pageHref?: string };
 
 /** Portada clicable del catálogo: abre un modal con la reseña del libro. */
-export default function ReviewCover({ title, author, url, tag, genre, description, requestHref, shareUrl, autoOpen = false, hideTrigger = false }: Props) {
+export default function ReviewCover({ title, author, url, tag, genre, description, requestHref, shareUrl, autoOpen = false, hideTrigger = false, pageHref }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   // Reseñas guardadas en otro idioma se reemplazan por la versión en español
   const [text, setText] = useState<string | null>(description && isSpanish(description) ? description : null);
@@ -55,6 +55,7 @@ export default function ReviewCover({ title, author, url, tag, genre, descriptio
               <h3 style={{ margin: 0 }}>{title}</h3>
               <span className="muted">{author}</span>
               {genre && <div><GenreTag genre={genre} /></div>}
+              {pageHref && <Link href={pageHref} style={{ fontSize: 14 }}>Ver página del libro →</Link>}
             </div>
           </div>
           <div className="rm-text">

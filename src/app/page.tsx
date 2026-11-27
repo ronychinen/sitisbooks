@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/supabase/server";
 import BookCover from "@/components/BookCover";
 import ReviewCover from "@/components/ReviewCover";
-import { bookShareUrl } from "@/lib/share";
+import { bookPath, bookShareUrl } from "@/lib/share";
 import GenreTag from "@/components/GenreTag";
 import SmoothLink from "@/components/SmoothLink";
 import CatalogFilters from "./CatalogFilters";
@@ -46,7 +46,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
       {shared && (
         <ReviewCover autoOpen hideTrigger title={shared.title} author={shared.author} url={shared.cover_url} genre={shared.genre} description={shared.description}
           requestHref={shared.request_id ? (user ? `/pedir/${shared.request_id}` : `/ingresar?next=${encodeURIComponent(`/pedir/${shared.request_id}`)}`) : null}
-          shareUrl={bookShareUrl(shared.book_key, myRef)} />
+          shareUrl={bookShareUrl(shared.book_key, myRef)} pageHref={bookPath(shared.book_key)} />
       )}
       <section className="lp-hero">
         <div className="lp-copy">
@@ -68,9 +68,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
             const slot = `lp-book lp-b${i + 1}`;
             if (!b) return <Link key={i} href={user ? "/donar" : "/ingresar?next=/donar"} className={`${slot} lp-empty`}><span>+ Tu libro aquí</span></Link>;
             const cover = <BookCover title={b.title} author={b.author} url={b.cover_url} />;
-            return b.request_id
-              ? <Link key={b.book_key} href={`/pedir/${b.request_id}`} className={slot} title={`${b.title} · ${b.author}`}>{cover}</Link>
-              : <div key={b.book_key} className={slot} title={`${b.title} · ${b.author}`}>{cover}</div>;
+            return <Link key={b.book_key} href={bookPath(b.book_key)} className={slot} title={`${b.title} · ${b.author}`}>{cover}</Link>;
           })}
           </div>
           <div className="lp-toast" aria-hidden="true"><span>+1</span><p><b>Crédito ganado</b><br />Tu libro llegó a su nuevo lector</p></div>
@@ -116,8 +114,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ q
         <div className="shelf">
           {books.map((b) => (
             <article className="book" key={b.book_key}>
-              <ReviewCover title={b.title} author={b.author} url={b.cover_url} tag={b.condition} genre={b.genre} description={b.description} requestHref={b.request_id ? `/pedir/${b.request_id}` : null} shareUrl={bookShareUrl(b.book_key, myRef)} />
-              <div className="title" title={b.title}>{b.title}</div>
+              <ReviewCover title={b.title} author={b.author} url={b.cover_url} tag={b.condition} genre={b.genre} description={b.description} requestHref={b.request_id ? `/pedir/${b.request_id}` : null} shareUrl={bookShareUrl(b.book_key, myRef)} pageHref={bookPath(b.book_key)} />
+              <Link className="title" title={b.title} href={bookPath(b.book_key)} style={{ color: "inherit", textDecoration: "none" }}>{b.title}</Link>
               <div className="author" title={b.author}>{b.author}</div>
               <div className="row" style={{ gap: 6 }}><GenreTag genre={b.genre} /><span className="copies">{copiesLabel(b.copies)}</span></div>
               {b.request_id

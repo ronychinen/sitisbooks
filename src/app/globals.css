@@ -285,3 +285,4 @@ tfoot th,tfoot td{border-bottom:0;border-top:2px solid var(--line);background:va
 .btn.wa:hover{background:#1EBE5A;border-color:#1EBE5A}
 .invite-link{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border:1px dashed #B9C9E6;border-radius:10px;background:var(--bg);font-family:var(--f-mono,monospace);font-size:14px;overflow-wrap:anywhere}
 .rm-share{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--line)}
+.crumbs{font-size:13px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}.crumbs a{color:inherit}
