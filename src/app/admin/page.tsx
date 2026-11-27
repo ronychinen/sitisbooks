@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { STATUS_LABEL, soles, type Request } from "@/lib/constants";
 import type { Profile } from "@/lib/supabase/server";
 import AdminCard from "./AdminCard";
+import DeleteCancelled from "./DeleteCancelled";
 
 export const dynamic = "force-dynamic";
 const TABS = ["pendiente_pago", "pago_en_revision", "pagado", "coordinando", "en_camino", "entregado", "cancelado"];
@@ -45,9 +46,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
       </div>
       {list.length === 0
         ? <div className="empty"><p>No hay intercambios en “{STATUS_LABEL[tab]}”.</p></div>
-        : <div className="list">{list.map((r) => (
-            <AdminCard key={r.id} r={r} donor={members[r.donor_id] ?? null} requester={members[r.requester_id] ?? null} proofUrl={proofs[r.id] ?? null} />
-          ))}</div>}
+        : <div className="list">
+            {tab === "cancelado" && <DeleteCancelled all ids={list.map((r) => r.id)} />}
+            {list.map((r) => tab === "cancelado" ? (
+              <div key={r.id} className="stack" style={{ gap: 6 }}>
+                <AdminCard r={r} donor={members[r.donor_id] ?? null} requester={members[r.requester_id] ?? null} proofUrl={proofs[r.id] ?? null} />
+                <DeleteCancelled ids={[r.id]} />
+              </div>
+            ) : (
+              <AdminCard key={r.id} r={r} donor={members[r.donor_id] ?? null} requester={members[r.requester_id] ?? null} proofUrl={proofs[r.id] ?? null} />
+            ))}
+          </div>}
     </>
   );
 }

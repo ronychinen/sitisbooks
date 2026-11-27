@@ -810,6 +810,23 @@ drop policy if exists "borrar avatar propio" on storage.objects;
 create policy "borrar avatar propio" on storage.objects for delete to authenticated
   using (bucket_id = 'avatares' and (storage.foldername(name))[1] = auth.uid()::text);
 
+-- v17: el admin puede eliminar pedidos cancelados (y sus comprobantes)
+create or replace function public.admin_delete_cancelled(p_ids uuid[])
+returns text[] language plpgsql security definer set search_path = public as $$
+declare v_paths text[];
+begin
+  if not public.is_admin() then raise exception 'Solo admin'; end if;
+  with d as (
+    delete from public.requests where id = any(p_ids) and status = 'cancelado' returning proof_path
+  ) select coalesce(array_agg(proof_path) filter (where proof_path is not null), '{}') into v_paths from d;
+  return v_paths;
+end $$;
+revoke execute on function public.admin_delete_cancelled(uuid[]) from public, anon;
+grant execute on function public.admin_delete_cancelled(uuid[]) to authenticated;
+drop policy if exists "admin borra comprobantes" on storage.objects;
+create policy "admin borra comprobantes" on storage.objects for delete to authenticated
+  using (bucket_id = 'comprobantes' and public.is_admin());
+
 -- v16: el método de pago ya no se pide al usuario
 alter table public.credit_purchases alter column payment_method drop not null;
 
